@@ -3,22 +3,29 @@ import numpy as np
 from matplotlib.widgets import Button, Slider
 
 
-# Define the vectors
 def direction(a=0, b=0, c=0):
-    return (c, ((a + b) / 2))
+    if a * b >= 0:
+        return (c, ((a + b) / 2))
+    else:
+        return (0, 0)
 
 
+# a = -b, c = b , c != 0
 def rotation(a=0, b=0, c=0):
-    return (((a - b - c) / 3), 0)
+    if a * b <= 0 and b * c > 0:
+        return (((a - b - c) / 3), 0)
+    else:
+        return (0, 0)
 
+
+lim_speed = 2
+vector1 = (0, 0)
+vector2 = (0, 0)
 
 # Create a figure and axis
 fig, ax = plt.subplots()
 fig.subplots_adjust(bottom=0.25)
 
-lim_speed = 2
-vector1 = (0, 0)
-vector2 = (0, 0)
 
 quiver1 = ax.quiver(
     0,
@@ -68,8 +75,7 @@ def update(val):
     c = slider_c.val
 
     vector1 = direction(a, b, c)
-    vector2 = rotation(a, b, c)  # a = -b, c = b , c != 0
-    print(((a - b - c) / 3), np.sin(c + b))
+    vector2 = rotation(a, b, c)
 
     # Set the axis limits based on vector lengths
     max_vector = abs(max(max(vector1, key=abs), max(vector2, key=abs), key=abs))
