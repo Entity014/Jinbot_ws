@@ -1,0 +1,16 @@
+package.xml
+setup.cfg
+setup.py
+jinbot_core/__init__.py
+jinbot_core/bot_drive.py
+jinbot_core.egg-info/PKG-INFO
+jinbot_core.egg-info/SOURCES.txt
+jinbot_core.egg-info/dependency_links.txt
+jinbot_core.egg-info/entry_points.txt
+jinbot_core.egg-info/requires.txt
+jinbot_core.egg-info/top_level.txt
+jinbot_core.egg-info/zip-safe
+resource/jinbot_core
+test/test_copyright.py
+test/test_flake8.py
+test/test_pep257.py

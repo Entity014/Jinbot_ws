@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/entity014/turtlebot3_ws/install/turtlebot3_gazebo/include/**",
+        "/home/entity014/turtlebot3_ws/install/turtlebot3_fake_node/include/**",
+        "/home/entity014/microros_ws/install/micro_ros_agent/include/**",
+        "/home/entity014/microros_ws/install/micro_ros_msgs/include/**",
+        "/opt/ros/foxy/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

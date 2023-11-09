@@ -1,0 +1,3 @@
+[console_scripts]
+drive_node = jinbot_core.bot_drive:main
+

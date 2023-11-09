@@ -1,0 +1,17 @@
+bot_drive_node:
+  ros__parameters:
+    speed:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+    rotation:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+
+flag_grip_node:
+  ros__parameters:
+    position:
+      x: 0.0
+      y: 0.0
+    theta: 0.0
