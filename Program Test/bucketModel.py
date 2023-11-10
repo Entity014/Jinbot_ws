@@ -2,6 +2,7 @@ from typing import Any
 import torch
 import numpy as np
 import cv2
+import os
 from pathlib import Path
 from ultralytics import YOLO
 
@@ -15,12 +16,16 @@ class ObjectDetection:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print("Using Device: ", self.device)
 
-        self.model = self.load_model("best.pt")
+        self.path = os.path.join(
+            os.path.expanduser("~"), "Jinbot_ws/Program Test/weights/"
+        )
+
+        self.model = self.load_model("model1_F.pt")
         self.CLASS_NAMES_DICT = self.model.model.names
         self.box_annotator = BoxAnnotator(thickness=3, text_thickness=1, text_scale=0.5)
 
     def load_model(self, file):
-        model = YOLO(f"{Path.home()}/Jinbot_ws/Program Test/weights/{file}")
+        model = YOLO(f"{self.path}/{file}")
         model.fuse()
         return model
 
@@ -83,5 +88,5 @@ class ObjectDetection:
         cv2.destroyAllWindows()
 
 
-detector = ObjectDetection(capture_index=7)
+detector = ObjectDetection(capture_index=3)
 detector()
