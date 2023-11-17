@@ -42,10 +42,13 @@ public:
                float wheel_diameter, float wheels_y_distance);
     velocities getVelocities(float rpm1, float rpm2, float rpm3);
     rpm getRPM(float linear_x, float linear_y, float angular_z);
+    pwm getPWM(float pwm1, float pwm2, float pwm3);
     float getMaxRPM();
 
 private:
     rpm calculateRPM(float linear_x, float linear_y, float angular_z);
+    pwm calculatePWM(float pwm1, float pwm2, float pwm3);
+    int signum(int value);
     int getTotalWheels(base robot_base);
 
     float max_rpm_;

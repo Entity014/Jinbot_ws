@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <Arduino.h>
-#include "config.h"
+#include "config_drive.h"
 #include "motor.h"
 #define ENCODER_USE_INTERRUPTS
 #define ENCODER_OPTIMIZE_INTERRUPTS

@@ -20,7 +20,7 @@ class ObjectDetection:
             os.path.expanduser("~"), "Jinbot_ws/Program Test/weights/"
         )
 
-        self.model = self.load_model("model1_F.pt")
+        self.model = self.load_model("model3_F.pt")
         self.CLASS_NAMES_DICT = self.model.model.names
         self.box_annotator = BoxAnnotator(thickness=3, text_thickness=1, text_scale=0.5)
 
@@ -35,7 +35,7 @@ class ObjectDetection:
 
     def plot_bboxes(self, results, frame):
         for result in results[0]:
-            if result.boxes.conf.cpu().numpy() >= 0.75:
+            if result.boxes.conf.cpu().numpy() >= 0.4:
                 detections = Detections(
                     xyxy=result.boxes.xyxy.cpu().numpy(),
                     confidence=result.boxes.conf.cpu().numpy(),
@@ -88,5 +88,5 @@ class ObjectDetection:
         cv2.destroyAllWindows()
 
 
-detector = ObjectDetection(capture_index=3)
+detector = ObjectDetection(capture_index=2)
 detector()

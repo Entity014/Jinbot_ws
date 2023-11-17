@@ -10,7 +10,7 @@ def on_button_click(event, x, y, flags, param):
         button_pressed = False
 
 
-cap = cv2.VideoCapture(3)
+cap = cv2.VideoCapture(2)
 cv2.namedWindow("webcam")
 cv2.setMouseCallback("webcam", on_button_click)
 button_pressed = False

@@ -12,7 +12,14 @@ Kinematics::Kinematics(base robot_base, int motor_max_rpm, float max_rpm_ratio,
     max_rpm_ = ((motor_power_max_voltage / motor_operating_voltage) * motor_max_rpm) * max_rpm_ratio;
 }
 
-Kinematics::rpm Kinematics::calculateRPM(float linear_x, float linear_y, float angular_z)
+int Kinematics::signum(int value)
+{
+    return (value > 0) ? 1 : (value < 0) ? -1
+                                         : 0;
+}
+
+Kinematics::rpm
+Kinematics::calculateRPM(float linear_x, float linear_y, float angular_z)
 {
 
     float tangential_vel = angular_z * (wheels_y_distance_ / 2.0);
@@ -56,30 +63,41 @@ Kinematics::rpm Kinematics::calculateRPM(float linear_x, float linear_y, float a
 
     Kinematics::rpm rpm;
 
-    // calculate for the target motor RPM and direction
-    // front-left motor
-    rpm.motor1 = x_rpm - y_rpm - tan_rpm;
+    // calculate for the target encoder RPM and direction
+    // left encoder
+    rpm.motor1 = x_rpm + tan_rpm;
     rpm.motor1 = constrain(rpm.motor1, -max_rpm_, max_rpm_);
 
-    // front-right motor
-    rpm.motor2 = x_rpm + y_rpm + tan_rpm;
+    // right encoder
+    rpm.motor2 = x_rpm - tan_rpm;
     rpm.motor2 = constrain(rpm.motor2, -max_rpm_, max_rpm_);
 
-    // rear-left motor
-    rpm.motor3 = x_rpm + y_rpm - tan_rpm;
+    // rear encoder
+    rpm.motor3 = y_rpm;
     rpm.motor3 = constrain(rpm.motor3, -max_rpm_, max_rpm_);
-
-    // // rear-right motor
-    // rpm.motor4 = x_rpm - y_rpm + tan_rpm;
-    // rpm.motor4 = constrain(rpm.motor4, -max_rpm_, max_rpm_);
 
     return rpm;
 }
 
+Kinematics::pwm Kinematics::calculatePWM(float pwm1, float pwm2, float pwm3)
+{
+    Kinematics::pwm pwm;
+    pwm.motor1 = round(float(pwm2 + pwm3) / 2) * signum(pwm1 * pwm2);
+    pwm.motor2 = round(float(pwm1 - pwm3) / 2) * signum(pwm1 * pwm2);
+    pwm.motor3 = round(float(pwm1 - pwm3) / 2);
+    pwm.motor4 = round(float(pwm2 + pwm3) / 2);
+
+    return pwm;
+}
+
 Kinematics::rpm Kinematics::getRPM(float linear_x, float linear_y, float angular_z)
 {
-    linear_y = 0.0;
     return calculateRPM(linear_x, linear_y, angular_z);
+}
+
+Kinematics::pwm Kinematics::getPWM(float pwm1, float pwm2, float pwm3)
+{
+    return calculatePWM(pwm1, pwm2, pwm3);
 }
 
 Kinematics::velocities Kinematics::getVelocities(float rpm1, float rpm2, float rpm3)

@@ -1,26 +1,20 @@
 #include <Arduino.h>
 #include <AccelStepper.h>
+#include "config_flag.h"
 
-const int dirPin = 3;
-const int stepPin = 4;
-int i = 0;
+AccelStepper step1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
 
-AccelStepper stepper(AccelStepper::DRIVER, stepPin, dirPin);
-
+float speed = 1000;
 void setup()
 {
-    stepper.setMaxSpeed(5000);
-    stepper.setAcceleration(100);
-    stepper.moveTo(400);
+    Serial.begin(115200);
+    // Sets the two pins as Outputs
+    step1.setMaxSpeed(speed);
+    step1.setAcceleration(speed * 2);
+    step1.moveTo(8000);
 }
-
 void loop()
 {
-    if (stepper.distanceToGo() == 0)
-    {
-        i++;
-        stepper.moveTo(400 * i);
-    }
-
-    stepper.run();
+    Serial.println(step1.speed());
+    step1.runSpeedToPosition();
 }

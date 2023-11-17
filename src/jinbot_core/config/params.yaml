@@ -15,3 +15,7 @@ flag_grip_node:
       x: 0.0
       y: 0.0
     theta: 0.0
+    speed:
+      x: 0.0
+      y: 0.0
+      z: 0.0

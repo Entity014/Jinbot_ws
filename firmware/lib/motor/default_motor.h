@@ -48,6 +48,8 @@ public:
 
     void brake() override
     {
+        digitalWrite(in_a_pin_, HIGH);
+        digitalWrite(in_b_pin_, HIGH);
         analogWrite(pwm_pin_, 0);
     }
 };

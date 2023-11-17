@@ -2,8 +2,7 @@
 #include <Arduino.h>
 #include <stdio.h>
 
-#include <config.h>
-#include <motor.h>
+#include <config_drive.h>
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
@@ -43,15 +42,10 @@
 static uint32_t preT = 0;
 bool preTS = false;
 
-Motor motor1_controller(PWM_FREQUENCY, PWM_BITS, MOTOR1_INV, MOTOR1_PWM, MOTOR1_IN_A, MOTOR1_IN_B);
-Motor motor2_controller(PWM_FREQUENCY, PWM_BITS, MOTOR2_INV, MOTOR2_PWM, MOTOR2_IN_A, MOTOR2_IN_B);
-Motor motor3_controller(PWM_FREQUENCY, PWM_BITS, MOTOR3_INV, MOTOR3_PWM, MOTOR3_IN_A, MOTOR3_IN_B);
-Motor motor4_controller(PWM_FREQUENCY, PWM_BITS, MOTOR4_INV, MOTOR4_PWM, MOTOR4_IN_A, MOTOR4_IN_B);
-
 //------------------------------ < Fuction > ----------------------------------------//
 int lim_switch(int lim_pin)
 {
-    return digitalRead(lim_pin);
+    return not digitalRead(lim_pin);
 }
 
 //------------------------------ < Ros Define > -------------------------------------//
@@ -130,13 +124,19 @@ void destroy_entities()
 
 void renew()
 {
+    digitalWrite(LED1_PIN, LOW);
+    digitalWrite(LED2_PIN, LOW);
 }
 
 void setup()
 {
     Serial.begin(115200);
     set_microros_serial_transports(Serial);
-    pinMode(LED_PIN, OUTPUT);
+    pinMode(LED1_PIN, OUTPUT);
+    pinMode(LED2_PIN, OUTPUT);
+
+    digitalWrite(LED1_PIN, LOW);
+    digitalWrite(LED2_PIN, LOW);
 }
 
 void loop()
@@ -170,19 +170,13 @@ void loop()
 
     if (state == AGENT_CONNECTED)
     {
-        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(LED1_PIN, HIGH);
+        digitalWrite(LED2_PIN, LOW);
     }
     else
     {
-        if (millis() - preT > 250)
-        {
-            if (preTS)
-                digitalWrite(LED_PIN, HIGH);
-            else
-                digitalWrite(LED_PIN, LOW);
-            preT = millis();
-            preTS = !preTS;
-        }
+        digitalWrite(LED1_PIN, LOW);
+        digitalWrite(LED2_PIN, HIGH);
         renew();
     }
 }
