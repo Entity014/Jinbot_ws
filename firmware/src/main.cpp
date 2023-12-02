@@ -44,24 +44,33 @@
 static uint32_t preT = 0;
 bool preTS = false;
 
-float tick1 = 0.0;
-float tick2 = 0.0;
-float tick3 = 0.0;
-float speed1 = 0.0;
-float speed2 = 0.0;
-float speed3 = 0.0;
-
 long positions[3];
+long pre_positions[3];
 
-AccelStepper step1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
-AccelStepper step2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
-AccelStepper step3(AccelStepper::DRIVER, STEP3_PWM, STEP3_DIR);
+AccelStepper stepM1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
+AccelStepper stepM2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
+AccelStepper stepM3(AccelStepper::DRIVER, STEP3_PWM, STEP3_DIR);
+
 MultiStepper multiStep;
-
 //------------------------------ < Fuction > ----------------------------------------//
 int lim_switch(int lim_pin)
 {
-  return not digitalRead(lim_pin);
+  return !digitalRead(lim_pin);
+}
+
+void task_step_fcn(void *arg)
+{
+  while (1)
+  {
+    if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
+    {
+      pre_positions[0] = positions[0];
+      pre_positions[1] = positions[1];
+      pre_positions[2] = positions[2];
+      multiStep.moveTo(positions);
+    }
+    multiStep.runSpeedToPosition();
+  }
 }
 
 //------------------------------ < Ros Define > -------------------------------------//
@@ -103,12 +112,12 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
   (void)last_call_time;
   if (timer != NULL)
   {
-    debug_msg.linear.x = tick1;
-    debug_msg.linear.y = tick2;
-    debug_msg.linear.z = tick3;
-    debug_msg.angular.x = speed1;
-    debug_msg.angular.y = speed2;
-    debug_msg.angular.z = speed3;
+    debug_msg.linear.x = stepM1.currentPosition();
+    debug_msg.linear.y = stepM1.distanceToGo();
+    debug_msg.linear.z = stepM1.targetPosition();
+    debug_msg.angular.x = stepM1.speed();
+    debug_msg.angular.y = stepM2.speed();
+    debug_msg.angular.z = stepM3.speed();
     rcl_publish(&pub_debug, &debug_msg, NULL);
   }
 }
@@ -120,24 +129,26 @@ void sub_position_callback(const void *msgin)
   positions[0] = position_msg->x;
   positions[1] = position_msg->y;
   positions[2] = position_msg->theta;
-  multiStep.moveTo(positions);
-  multiStep.runSpeedToPosition();
-  tick1 = step1.currentPosition();
-  tick2 = step2.currentPosition();
-  tick3 = step3.currentPosition();
+  // if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
+  // {
+  //   pre_positions[0] = positions[0];
+  //   pre_positions[1] = positions[1];
+  //   pre_positions[2] = positions[2];
+  //   multiStep.moveTo(positions);
+  // }
+  // multiStep.runSpeedToPosition();
 }
 
 void sub_speed_callback(const void *msgin)
 {
   const geometry_msgs__msg__Vector3 *speed_msg = (const geometry_msgs__msg__Vector3 *)msgin;
-  step1.setSpeed(speed_msg->x);
-  step2.setSpeed(speed_msg->y);
-  step3.setSpeed(speed_msg->z);
-  speed1 = step1.speed();
-  speed2 = step2.speed();
-  speed3 = step3.speed();
+  stepM1.setMaxSpeed(speed_msg->x);
+  stepM2.setMaxSpeed(speed_msg->y);
+  stepM3.setMaxSpeed(speed_msg->z);
+  stepM1.setAcceleration(speed_msg->x);
+  stepM2.setAcceleration(speed_msg->y);
+  stepM3.setAcceleration(speed_msg->z);
 }
-
 //------------------------------ < Ros Fuction > ------------------------------------//
 
 bool create_entities()
@@ -219,13 +230,18 @@ void setup()
 
   digitalWrite(LED1_PIN, LOW);
   digitalWrite(LED2_PIN, LOW);
-  step1.setMaxSpeed(2e4);
-  step2.setMaxSpeed(2e4);
-  step3.setMaxSpeed(2e4);
 
-  multiStep.addStepper(step1);
-  multiStep.addStepper(step2);
-  multiStep.addStepper(step3);
+  multiStep.addStepper(stepM1);
+  multiStep.addStepper(stepM2);
+  multiStep.addStepper(stepM3);
+  stepM1.setCurrentPosition(0);
+  xTaskCreate(
+      task_step_fcn, /* Task function. */
+      "Step Task",   /* String with name of task. */
+      1000,          /* Stack size in bytes. */
+      NULL,          /* Parameter passed as input of the task */
+      0,             /* Priority of the task. */
+      NULL);         /* Task handle. */
 }
 
 void loop()

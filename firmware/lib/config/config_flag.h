@@ -16,22 +16,22 @@
 #define LENGTH_E
 
 // servo pin
-#define SERVO1 12
-#define SERVO2 13
+#define SERVO1 0
+#define SERVO2 2
 
 // step motor pin
-#define STEP1_PWM 1
-#define STEP1_DIR 0
+#define STEP1_PWM 4
+#define STEP1_DIR 1
 
-#define STEP2_PWM 3
-#define STEP2_DIR 2
+#define STEP2_PWM 5
+#define STEP2_DIR 4
 
-#define STEP3_PWM 5
-#define STEP3_DIR 4
+#define STEP3_PWM 12
+#define STEP3_DIR 13
 
 // ultrasonic pin
-#define TRIGER 13
-#define ECHO 14
+#define TRIGER 14
+#define ECHO 15
 
 // limit switch pin
 #define LIMIT1 34

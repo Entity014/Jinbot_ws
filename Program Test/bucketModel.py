@@ -20,7 +20,7 @@ class ObjectDetection:
             os.path.expanduser("~"), "Jinbot_ws/Program Test/weights/"
         )
 
-        self.model = self.load_model("model3_F.pt")
+        self.model = self.load_model("best.pt")
         self.CLASS_NAMES_DICT = self.model.model.names
         self.box_annotator = BoxAnnotator(thickness=3, text_thickness=1, text_scale=0.5)
 
