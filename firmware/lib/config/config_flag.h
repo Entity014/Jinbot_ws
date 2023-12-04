@@ -1,37 +1,38 @@
 #ifndef CONFIG_FLAG_H
 #define CONFIG_FLAG_H
 
-#define LED1_PIN 16
-#define LED2_PIN 17
+#define LED1_PIN 17
+#define LED2_PIN 18
 
 #define USE_PARALLEL_3DOF // parallel gripper 3 degree of freedom
 
-#define STEP1_SPEED 100
-#define STEP2_SPEED 100
-#define STEP3_SPEED 100
-#define LENGTH_A
-#define LENGTH_B
-#define LENGTH_C
-#define LENGTH_D
-#define LENGTH_E
+#define STEP1_SPEED 20000
+#define STEP2_SPEED 20000
+#define STEP3_SPEED 20000
+#define LENGTH_A 0.293
+#define LENGTH_B 0.365
+#define LENGTH_C 0.365
+#define LENGTH_D 0.293
+#define LENGTH_E 0.080
+#define LENGTH_F 0.127
 
 // servo pin
 #define SERVO1 0
 #define SERVO2 2
 
 // step motor pin
-#define STEP1_PWM 4
-#define STEP1_DIR 1
+#define STEP1_PWM 5
+#define STEP1_DIR 4
 
-#define STEP2_PWM 5
-#define STEP2_DIR 4
+#define STEP2_PWM 13
+#define STEP2_DIR 12
 
-#define STEP3_PWM 12
-#define STEP3_DIR 13
+#define STEP3_PWM 16
+#define STEP3_DIR 15
 
 // ultrasonic pin
-#define TRIGER 14
-#define ECHO 15
+#define TRIGER 17
+#define ECHO 18
 
 // limit switch pin
 #define LIMIT1 34

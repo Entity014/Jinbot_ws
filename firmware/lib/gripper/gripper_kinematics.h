@@ -10,7 +10,7 @@ public:
         float angular_b;
     };
 
-    Parallel_3dof(float length_a, float length_b, float length_c, float length_d, float length_e);
+    Parallel_3dof(float length_a, float length_b, float length_c, float length_d, float length_e, float length_f);
     angular getAngular(float position_x, float position_y);
 
 private:
@@ -21,6 +21,7 @@ private:
     float length_c_;
     float length_d_;
     float length_e_;
+    float length_f_;
 };
 
 #endif

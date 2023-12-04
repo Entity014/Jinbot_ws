@@ -129,14 +129,6 @@ void sub_position_callback(const void *msgin)
     positions[0] = position_msg->x;
     positions[1] = position_msg->y;
     positions[2] = position_msg->theta;
-    // if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
-    // {
-    //   pre_positions[0] = positions[0];
-    //   pre_positions[1] = positions[1];
-    //   pre_positions[2] = positions[2];
-    //   multiStep.moveTo(positions);
-    // }
-    // multiStep.runSpeedToPosition();
 }
 
 void sub_speed_callback(const void *msgin)

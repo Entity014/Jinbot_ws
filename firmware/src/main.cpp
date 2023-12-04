@@ -1,6 +1,7 @@
 #include <micro_ros_platformio.h>
 #include <Arduino.h>
 #include <stdio.h>
+#include <ESP32_Servo.h>
 #include <AccelStepper.h>
 #include <MultiStepper.h>
 
@@ -47,31 +48,31 @@ bool preTS = false;
 long positions[3];
 long pre_positions[3];
 
+Servo servo1;
+Servo servo2;
+
 AccelStepper stepM1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
 AccelStepper stepM2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
 AccelStepper stepM3(AccelStepper::DRIVER, STEP3_PWM, STEP3_DIR);
-
 MultiStepper multiStep;
-//------------------------------ < Fuction > ----------------------------------------//
-int lim_switch(int lim_pin)
-{
-  return !digitalRead(lim_pin);
-}
 
-void task_step_fcn(void *arg)
-{
-  while (1)
-  {
-    if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
-    {
-      pre_positions[0] = positions[0];
-      pre_positions[1] = positions[1];
-      pre_positions[2] = positions[2];
-      multiStep.moveTo(positions);
-    }
-    multiStep.runSpeedToPosition();
-  }
-}
+Parallel_3dof::angular temp_ang;
+Parallel_3dof flagGripper(LENGTH_A, LENGTH_B, LENGTH_C, LENGTH_D, LENGTH_E, LENGTH_F);
+
+//------------------------------ < Fuction Prototype > ------------------------------//
+
+int lim_switch(int lim_pin);
+void task_arduino_fcn(void *arg);
+
+//------------------------------ < Ros Fuction Prototype > --------------------------//
+
+void task_ros_fcn(void *arg);
+void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
+void sub_position_callback(const void *msgin);
+void sub_speed_callback(const void *msgin);
+bool create_entities();
+void destroy_entities();
+void renew();
 
 //------------------------------ < Ros Define > -------------------------------------//
 // basic
@@ -105,6 +106,113 @@ enum states
   AGENT_DISCONNECTED
 } state;
 
+//------------------------------ < Main > -------------------------------------------//
+
+void setup()
+{
+  xTaskCreate(
+      task_arduino_fcn, /* Task function. */
+      "Arduino Task",   /* String with name of task. */
+      1024,             /* Stack size in bytes. */
+      NULL,             /* Parameter passed as input of the task */
+      0,                /* Priority of the task. */
+      NULL);            /* Task handle. */
+
+  xTaskCreate(
+      task_ros_fcn, /* Task function. */
+      "Ros Task",   /* String with name of task. */
+      4096,         /* Stack size in bytes. */
+      NULL,         /* Parameter passed as input of the task */
+      1,            /* Priority of the task. */
+      NULL);        /* Task handle. */
+}
+
+void loop()
+{
+}
+
+//------------------------------ < Fuction > ----------------------------------------//
+int lim_switch(int lim_pin)
+{
+  return !digitalRead(lim_pin);
+}
+
+void task_arduino_fcn(void *arg)
+{
+  stepM1.setMaxSpeed(STEP1_SPEED);
+  stepM2.setMaxSpeed(STEP2_SPEED);
+  stepM1.setAcceleration(STEP1_SPEED);
+  stepM2.setAcceleration(STEP2_SPEED);
+  stepM1.setCurrentPosition(0);
+
+  multiStep.addStepper(stepM1);
+  multiStep.addStepper(stepM2);
+  multiStep.addStepper(stepM3);
+  while (true)
+  {
+    if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
+    {
+      pre_positions[0] = positions[0];
+      pre_positions[1] = positions[1];
+      pre_positions[2] = positions[2];
+      multiStep.moveTo(positions);
+    }
+    multiStep.runSpeedToPosition();
+  }
+}
+
+void task_ros_fcn(void *arg)
+{
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  while (true)
+  {
+    switch (state)
+    {
+    case WAITING_AGENT:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+      break;
+    case AGENT_AVAILABLE:
+      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+      if (state == WAITING_AGENT)
+      {
+        destroy_entities();
+      };
+      break;
+    case AGENT_CONNECTED:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
+      if (state == AGENT_CONNECTED)
+      {
+        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+      }
+      break;
+    case AGENT_DISCONNECTED:
+      destroy_entities();
+      state = WAITING_AGENT;
+      break;
+    default:
+      break;
+    }
+
+    if (state == AGENT_CONNECTED)
+    {
+      digitalWrite(LED1_PIN, HIGH);
+      digitalWrite(LED2_PIN, HIGH);
+    }
+    else
+    {
+      digitalWrite(LED1_PIN, LOW);
+      digitalWrite(LED2_PIN, HIGH);
+      renew();
+    }
+  }
+}
+
 //------------------------------ < Publisher Fuction > ------------------------------//
 
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
@@ -113,8 +221,8 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
   if (timer != NULL)
   {
     debug_msg.linear.x = stepM1.currentPosition();
-    debug_msg.linear.y = stepM1.distanceToGo();
-    debug_msg.linear.z = stepM1.targetPosition();
+    debug_msg.linear.y = temp_ang.angular_a;
+    debug_msg.linear.z = temp_ang.angular_b;
     debug_msg.angular.x = stepM1.speed();
     debug_msg.angular.y = stepM2.speed();
     debug_msg.angular.z = stepM3.speed();
@@ -126,27 +234,16 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
 void sub_position_callback(const void *msgin)
 {
   const geometry_msgs__msg__Pose2D *position_msg = (const geometry_msgs__msg__Pose2D *)msgin;
-  positions[0] = position_msg->x;
-  positions[1] = position_msg->y;
-  positions[2] = position_msg->theta;
-  // if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
-  // {
-  //   pre_positions[0] = positions[0];
-  //   pre_positions[1] = positions[1];
-  //   pre_positions[2] = positions[2];
-  //   multiStep.moveTo(positions);
-  // }
-  // multiStep.runSpeedToPosition();
+  temp_ang = flagGripper.getAngular(position_msg->x, position_msg->y);
+  // positions[0] = position_msg->x;
+  // positions[1] = position_msg->y;
+  // positions[2] = position_msg->theta;
 }
 
 void sub_speed_callback(const void *msgin)
 {
   const geometry_msgs__msg__Vector3 *speed_msg = (const geometry_msgs__msg__Vector3 *)msgin;
-  stepM1.setMaxSpeed(speed_msg->x);
-  stepM2.setMaxSpeed(speed_msg->y);
   stepM3.setMaxSpeed(speed_msg->z);
-  stepM1.setAcceleration(speed_msg->x);
-  stepM2.setAcceleration(speed_msg->y);
   stepM3.setAcceleration(speed_msg->z);
 }
 //------------------------------ < Ros Fuction > ------------------------------------//
@@ -217,71 +314,4 @@ void destroy_entities()
 
 void renew()
 {
-  digitalWrite(LED1_PIN, LOW);
-  digitalWrite(LED2_PIN, LOW);
-}
-
-void setup()
-{
-  Serial.begin(115200);
-  set_microros_serial_transports(Serial);
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-
-  digitalWrite(LED1_PIN, LOW);
-  digitalWrite(LED2_PIN, LOW);
-
-  multiStep.addStepper(stepM1);
-  multiStep.addStepper(stepM2);
-  multiStep.addStepper(stepM3);
-  stepM1.setCurrentPosition(0);
-  xTaskCreate(
-      task_step_fcn, /* Task function. */
-      "Step Task",   /* String with name of task. */
-      1000,          /* Stack size in bytes. */
-      NULL,          /* Parameter passed as input of the task */
-      0,             /* Priority of the task. */
-      NULL);         /* Task handle. */
-}
-
-void loop()
-{
-  switch (state)
-  {
-  case WAITING_AGENT:
-    EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
-    break;
-  case AGENT_AVAILABLE:
-    state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-    if (state == WAITING_AGENT)
-    {
-      destroy_entities();
-    };
-    break;
-  case AGENT_CONNECTED:
-    EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-    if (state == AGENT_CONNECTED)
-    {
-      rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-    }
-    break;
-  case AGENT_DISCONNECTED:
-    destroy_entities();
-    state = WAITING_AGENT;
-    break;
-  default:
-    break;
-  }
-
-  if (state == AGENT_CONNECTED)
-  {
-    digitalWrite(LED1_PIN, HIGH);
-    digitalWrite(LED2_PIN, LOW);
-  }
-  else
-  {
-    digitalWrite(LED1_PIN, LOW);
-    digitalWrite(LED2_PIN, HIGH);
-    renew();
-  }
 }

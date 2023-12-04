@@ -1,11 +1,12 @@
 #include <Arduino.h>
 #include "gripper_kinematics.h"
 
-Parallel_3dof::Parallel_3dof(float length_a, float length_b, float length_c, float length_d, float length_e) : length_a_(length_a),
-                                                                                                               length_b_(length_b),
-                                                                                                               length_c_(length_c),
-                                                                                                               length_d_(length_d),
-                                                                                                               length_e_(length_e)
+Parallel_3dof::Parallel_3dof(float length_a, float length_b, float length_c, float length_d, float length_e, float length_f) : length_a_(length_a),
+                                                                                                                               length_b_(length_b),
+                                                                                                                               length_c_(length_c),
+                                                                                                                               length_d_(length_d),
+                                                                                                                               length_e_(length_e),
+                                                                                                                               length_f_(length_f)
 {
 }
 
@@ -35,5 +36,6 @@ Parallel_3dof::angular Parallel_3dof::inverseKinematics(float position_x, float 
 
 Parallel_3dof::angular Parallel_3dof::getAngular(float position_x, float position_y)
 {
+    position_y -= length_f_ * sin(90 * DEG_TO_RAD);
     return inverseKinematics(position_x, position_y);
 }
