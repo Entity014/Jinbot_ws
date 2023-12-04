@@ -15,7 +15,7 @@ public:
 
 private:
     angular inverseKinematics(float position_x, float position_y);
-    float inverseFormular(float point_a, float point_b, float point_c);
+    float inverseFormular(float point_a, float point_b, float point_c, bool invert);
     float length_a_;
     float length_b_;
     float length_c_;

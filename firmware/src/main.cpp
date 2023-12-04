@@ -56,7 +56,7 @@ AccelStepper stepM2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
 AccelStepper stepM3(AccelStepper::DRIVER, STEP3_PWM, STEP3_DIR);
 MultiStepper multiStep;
 
-Parallel_3dof::angular temp_ang;
+Parallel_3dof::angular angular;
 Parallel_3dof flagGripper(LENGTH_A, LENGTH_B, LENGTH_C, LENGTH_D, LENGTH_E, LENGTH_F);
 
 //------------------------------ < Fuction Prototype > ------------------------------//
@@ -148,6 +148,11 @@ void task_arduino_fcn(void *arg)
   multiStep.addStepper(stepM1);
   multiStep.addStepper(stepM2);
   multiStep.addStepper(stepM3);
+
+  servo1.attach(SERVO1);
+  servo2.attach(SERVO2);
+  servo1.write(0);
+  servo2.write(90);
   while (true)
   {
     if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
@@ -161,58 +166,6 @@ void task_arduino_fcn(void *arg)
   }
 }
 
-void task_ros_fcn(void *arg)
-{
-  Serial.begin(115200);
-  set_microros_serial_transports(Serial);
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-
-  digitalWrite(LED1_PIN, LOW);
-  digitalWrite(LED2_PIN, LOW);
-  while (true)
-  {
-    switch (state)
-    {
-    case WAITING_AGENT:
-      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
-      break;
-    case AGENT_AVAILABLE:
-      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-      if (state == WAITING_AGENT)
-      {
-        destroy_entities();
-      };
-      break;
-    case AGENT_CONNECTED:
-      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-      if (state == AGENT_CONNECTED)
-      {
-        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-      }
-      break;
-    case AGENT_DISCONNECTED:
-      destroy_entities();
-      state = WAITING_AGENT;
-      break;
-    default:
-      break;
-    }
-
-    if (state == AGENT_CONNECTED)
-    {
-      digitalWrite(LED1_PIN, HIGH);
-      digitalWrite(LED2_PIN, HIGH);
-    }
-    else
-    {
-      digitalWrite(LED1_PIN, LOW);
-      digitalWrite(LED2_PIN, HIGH);
-      renew();
-    }
-  }
-}
-
 //------------------------------ < Publisher Fuction > ------------------------------//
 
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
@@ -221,23 +174,29 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
   if (timer != NULL)
   {
     debug_msg.linear.x = stepM1.currentPosition();
-    debug_msg.linear.y = temp_ang.angular_a;
-    debug_msg.linear.z = temp_ang.angular_b;
-    debug_msg.angular.x = stepM1.speed();
-    debug_msg.angular.y = stepM2.speed();
+    debug_msg.linear.y = angular.angular_a;
+    debug_msg.linear.z = angular.angular_b;
+    debug_msg.angular.x = angular.angular_a;
+    debug_msg.angular.y = angular.angular_b;
     debug_msg.angular.z = stepM3.speed();
     rcl_publish(&pub_debug, &debug_msg, NULL);
   }
 }
 
 //------------------------------ < Subscriber Fuction > -----------------------------//
+
 void sub_position_callback(const void *msgin)
 {
   const geometry_msgs__msg__Pose2D *position_msg = (const geometry_msgs__msg__Pose2D *)msgin;
-  temp_ang = flagGripper.getAngular(position_msg->x, position_msg->y);
+  angular = flagGripper.getAngular(position_msg->x, position_msg->y);
+  if ((position_msg->x != 0) || (position_msg->y != 0))
+  {
+    positions[0] = ((float)177000 / 90) * angular.angular_a;
+    positions[1] = ((float)177000 / 90) * angular.angular_b;
+    positions[2] = position_msg->theta;
+  }
   // positions[0] = position_msg->x;
   // positions[1] = position_msg->y;
-  // positions[2] = position_msg->theta;
 }
 
 void sub_speed_callback(const void *msgin)
@@ -314,4 +273,58 @@ void destroy_entities()
 
 void renew()
 {
+  servo1.write(0);
+  servo2.write(90);
+}
+
+void task_ros_fcn(void *arg)
+{
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  while (true)
+  {
+    switch (state)
+    {
+    case WAITING_AGENT:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+      break;
+    case AGENT_AVAILABLE:
+      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+      if (state == WAITING_AGENT)
+      {
+        destroy_entities();
+      };
+      break;
+    case AGENT_CONNECTED:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
+      if (state == AGENT_CONNECTED)
+      {
+        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+      }
+      break;
+    case AGENT_DISCONNECTED:
+      destroy_entities();
+      state = WAITING_AGENT;
+      break;
+    default:
+      break;
+    }
+
+    if (state == AGENT_CONNECTED)
+    {
+      digitalWrite(LED1_PIN, HIGH);
+      digitalWrite(LED2_PIN, HIGH);
+    }
+    else
+    {
+      digitalWrite(LED1_PIN, LOW);
+      digitalWrite(LED2_PIN, HIGH);
+      renew();
+    }
+  }
 }

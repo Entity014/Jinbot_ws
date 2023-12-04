@@ -1,8 +1,8 @@
 #ifndef CONFIG_FLAG_H
 #define CONFIG_FLAG_H
 
-#define LED1_PIN 17
-#define LED2_PIN 18
+#define LED1_PIN 32
+#define LED2_PIN 33
 
 #define USE_PARALLEL_3DOF // parallel gripper 3 degree of freedom
 
@@ -10,8 +10,8 @@
 #define STEP2_SPEED 20000
 #define STEP3_SPEED 20000
 #define LENGTH_A 0.293
-#define LENGTH_B 0.365
-#define LENGTH_C 0.365
+#define LENGTH_B 0.352
+#define LENGTH_C 0.352
 #define LENGTH_D 0.293
 #define LENGTH_E 0.080
 #define LENGTH_F 0.127
