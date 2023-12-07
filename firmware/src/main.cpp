@@ -13,7 +13,6 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <rmw_microros/rmw_microros.h>
 #include <geometry_msgs/msg/pose2_d.h>
 #include <geometry_msgs/msg/vector3.h>
 #include <geometry_msgs/msg/twist.h>
@@ -132,6 +131,7 @@ void loop()
 }
 
 //------------------------------ < Fuction > ----------------------------------------//
+
 int lim_switch(int lim_pin)
 {
   return !digitalRead(lim_pin);
@@ -139,11 +139,16 @@ int lim_switch(int lim_pin)
 
 void task_arduino_fcn(void *arg)
 {
+  pinMode(LIMIT1, INPUT_PULLUP);
+  pinMode(LIMIT2, INPUT_PULLUP);
+  pinMode(LIMIT3, INPUT_PULLUP);
+
   stepM1.setMaxSpeed(STEP1_SPEED);
   stepM2.setMaxSpeed(STEP2_SPEED);
+  stepM3.setMaxSpeed(STEP3_SPEED);
   stepM1.setAcceleration(STEP1_SPEED);
   stepM2.setAcceleration(STEP2_SPEED);
-  stepM1.setCurrentPosition(0);
+  stepM3.setAcceleration(STEP3_SPEED);
 
   multiStep.addStepper(stepM1);
   multiStep.addStepper(stepM2);
@@ -153,8 +158,27 @@ void task_arduino_fcn(void *arg)
   servo2.attach(SERVO2);
   servo1.write(0);
   servo2.write(90);
+  positions[0] = 1e6;
+  positions[1] = 1e6;
+  positions[2] = 1e6;
+  multiStep.moveTo(positions);
   while (true)
   {
+    if (lim_switch(LIMIT1))
+    {
+      stepM1.setSpeed(0);
+      stepM1.setCurrentPosition(0);
+    }
+    if (lim_switch(LIMIT2))
+    {
+      stepM2.setSpeed(0);
+      stepM2.setCurrentPosition(0);
+    }
+    if (lim_switch(LIMIT3))
+    {
+      stepM3.setSpeed(0);
+      stepM3.setCurrentPosition(0);
+    }
     if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
     {
       pre_positions[0] = positions[0];
@@ -162,50 +186,63 @@ void task_arduino_fcn(void *arg)
       pre_positions[2] = positions[2];
       multiStep.moveTo(positions);
     }
-    multiStep.runSpeedToPosition();
+    multiStep.run();
   }
 }
 
-//------------------------------ < Publisher Fuction > ------------------------------//
-
-void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
-{
-  (void)last_call_time;
-  if (timer != NULL)
-  {
-    debug_msg.linear.x = stepM1.currentPosition();
-    debug_msg.linear.y = angular.angular_a;
-    debug_msg.linear.z = angular.angular_b;
-    debug_msg.angular.x = angular.angular_a;
-    debug_msg.angular.y = angular.angular_b;
-    debug_msg.angular.z = stepM3.speed();
-    rcl_publish(&pub_debug, &debug_msg, NULL);
-  }
-}
-
-//------------------------------ < Subscriber Fuction > -----------------------------//
-
-void sub_position_callback(const void *msgin)
-{
-  const geometry_msgs__msg__Pose2D *position_msg = (const geometry_msgs__msg__Pose2D *)msgin;
-  angular = flagGripper.getAngular(position_msg->x, position_msg->y);
-  if ((position_msg->x != 0) || (position_msg->y != 0))
-  {
-    positions[0] = ((float)177000 / 90) * angular.angular_a;
-    positions[1] = ((float)177000 / 90) * angular.angular_b;
-    positions[2] = position_msg->theta;
-  }
-  // positions[0] = position_msg->x;
-  // positions[1] = position_msg->y;
-}
-
-void sub_speed_callback(const void *msgin)
-{
-  const geometry_msgs__msg__Vector3 *speed_msg = (const geometry_msgs__msg__Vector3 *)msgin;
-  stepM3.setMaxSpeed(speed_msg->z);
-  stepM3.setAcceleration(speed_msg->z);
-}
 //------------------------------ < Ros Fuction > ------------------------------------//
+
+void task_ros_fcn(void *arg)
+{
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  while (true)
+  {
+    switch (state)
+    {
+    case WAITING_AGENT:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+      break;
+    case AGENT_AVAILABLE:
+      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+      if (state == WAITING_AGENT)
+      {
+        destroy_entities();
+      };
+      break;
+    case AGENT_CONNECTED:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
+      if (state == AGENT_CONNECTED)
+      {
+        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+      }
+      break;
+    case AGENT_DISCONNECTED:
+      destroy_entities();
+      state = WAITING_AGENT;
+      break;
+    default:
+      break;
+    }
+
+    if (state == AGENT_CONNECTED)
+    {
+      digitalWrite(LED1_PIN, HIGH);
+      digitalWrite(LED2_PIN, HIGH);
+    }
+    else
+    {
+      digitalWrite(LED1_PIN, LOW);
+      digitalWrite(LED2_PIN, HIGH);
+      renew();
+    }
+  }
+}
 
 bool create_entities()
 {
@@ -277,54 +314,40 @@ void renew()
   servo2.write(90);
 }
 
-void task_ros_fcn(void *arg)
+//------------------------------ < Publisher Fuction > ------------------------------//
+
+void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
 {
-  Serial.begin(115200);
-  set_microros_serial_transports(Serial);
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-
-  digitalWrite(LED1_PIN, LOW);
-  digitalWrite(LED2_PIN, LOW);
-  while (true)
+  (void)last_call_time;
+  if (timer != NULL)
   {
-    switch (state)
-    {
-    case WAITING_AGENT:
-      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
-      break;
-    case AGENT_AVAILABLE:
-      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-      if (state == WAITING_AGENT)
-      {
-        destroy_entities();
-      };
-      break;
-    case AGENT_CONNECTED:
-      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-      if (state == AGENT_CONNECTED)
-      {
-        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-      }
-      break;
-    case AGENT_DISCONNECTED:
-      destroy_entities();
-      state = WAITING_AGENT;
-      break;
-    default:
-      break;
-    }
-
-    if (state == AGENT_CONNECTED)
-    {
-      digitalWrite(LED1_PIN, HIGH);
-      digitalWrite(LED2_PIN, HIGH);
-    }
-    else
-    {
-      digitalWrite(LED1_PIN, LOW);
-      digitalWrite(LED2_PIN, HIGH);
-      renew();
-    }
+    debug_msg.linear.x = stepM1.currentPosition();
+    debug_msg.linear.y = stepM2.currentPosition();
+    debug_msg.linear.z = stepM3.currentPosition();
+    debug_msg.angular.x = stepM1.speed();
+    debug_msg.angular.y = stepM2.speed();
+    debug_msg.angular.z = stepM3.speed();
+    rcl_publish(&pub_debug, &debug_msg, NULL);
   }
+}
+
+//------------------------------ < Subscriber Fuction > -----------------------------//
+
+void sub_position_callback(const void *msgin)
+{
+  const geometry_msgs__msg__Pose2D *position_msg = (const geometry_msgs__msg__Pose2D *)msgin;
+  angular = flagGripper.getAngular(position_msg->x, position_msg->y);
+  if ((position_msg->x != 0) || (position_msg->y != 0))
+  {
+    positions[0] = ((float)177000 / 90) * angular.angular_a;
+    positions[1] = ((float)177000 / 90) * angular.angular_b;
+    // positions[2] = position_msg->theta;
+  }
+  // positions[0] = position_msg->x;
+  // positions[1] = position_msg->y;
+}
+
+void sub_speed_callback(const void *msgin)
+{
+  const geometry_msgs__msg__Vector3 *speed_msg = (const geometry_msgs__msg__Vector3 *)msgin;
 }

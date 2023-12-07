@@ -1,21 +1,23 @@
 #include <micro_ros_platformio.h>
 #include <Arduino.h>
 #include <stdio.h>
-#include <ESP32_Servo.h>
-#include <AccelStepper.h>
-#include <MultiStepper.h>
 
-#include <config_flag.h>
-#include <gripper.h>
+#include <config_drive_input.h>
+#include <kinematics.h>
+#include <pid.h>
+#include <odometry.h>
+#include <imu.h>
+#include <ESP32Encoder.h>
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <geometry_msgs/msg/pose2_d.h>
-#include <geometry_msgs/msg/vector3.h>
+#include <nav_msgs/msg/odometry.h>
+#include <sensor_msgs/msg/imu.h>
 #include <geometry_msgs/msg/twist.h>
+#include <geometry_msgs/msg/vector3.h>
 
 #define RCCHECK(fn)                  \
     {                                \
@@ -23,6 +25,13 @@
         if ((temp_rc != RCL_RET_OK)) \
         {                            \
             return false;            \
+        }                            \
+    }
+#define RCSOFTCHECK(fn)              \
+    {                                \
+        rcl_ret_t temp_rc = fn;      \
+        if ((temp_rc != RCL_RET_OK)) \
+        {                            \
         }                            \
     }
 #define EXECUTE_EVERY_N_MS(MS, X)          \
@@ -41,34 +50,43 @@
     } while (0)
 
 //------------------------------ < ESP32 Define > -----------------------------------//
-static uint32_t preT = 0;
-bool preTS = false;
+unsigned long long time_offset = 0;
+unsigned long prev_velocity_time = 0;
+unsigned long prev_odom_update = 0;
 
-long positions[3];
-long pre_positions[3];
+ESP32Encoder motor1_encoder(COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
+ESP32Encoder motor2_encoder(COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
+ESP32Encoder motor3_encoder(COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
 
-Servo servo1;
-Servo servo2;
+PID motor1_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
+PID motor2_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
+PID motor3_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
+PID motor4_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
 
-AccelStepper stepM1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
-AccelStepper stepM2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
-AccelStepper stepM3(AccelStepper::DRIVER, STEP3_PWM, STEP3_DIR);
-MultiStepper multiStep;
+Kinematics kinematics(
+    Kinematics::MECANUM,
+    MOTOR_MAX_RPM,
+    MAX_RPM_RATIO,
+    MOTOR_OPERATING_VOLTAGE,
+    MOTOR_POWER_MAX_VOLTAGE,
+    WHEEL_DIAMETER,
+    LR_WHEELS_DISTANCE);
 
-Parallel_3dof::angular angular;
-Parallel_3dof flagGripper(LENGTH_A, LENGTH_B, LENGTH_C, LENGTH_D, LENGTH_E, LENGTH_F);
+Odometry odometry;
+IMU imu;
 
 //------------------------------ < Fuction Prototype > ------------------------------//
-
-int lim_switch(int lim_pin);
 void task_arduino_fcn(void *arg);
+void moveBase();
+void syncTime();
+void publishData();
+struct timespec getTime();
 
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
 void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
-void sub_position_callback(const void *msgin);
-void sub_speed_callback(const void *msgin);
+void sub_velocity_callback(const void *msgin);
 bool create_entities();
 void destroy_entities();
 void renew();
@@ -82,16 +100,20 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
-geometry_msgs__msg__Pose2D position_msg;
-geometry_msgs__msg__Vector3 speed_msg;
+sensor_msgs__msg__Imu imu_msg;
+nav_msgs__msg__Odometry odom_msg;
+geometry_msgs__msg__Twist pwm_msg;
 geometry_msgs__msg__Twist debug_msg;
+geometry_msgs__msg__Twist velocity_msg;
 
 // ? define publisher
 rcl_publisher_t pub_debug;
+rcl_publisher_t pub_odom;
+rcl_publisher_t pub_imu;
+rcl_publisher_t pub_pwm;
 
 // ? define subscriber
-rcl_subscription_t sub_position;
-rcl_subscription_t sub_speed;
+rcl_subscription_t sub_velocity;
 
 rcl_init_options_t init_options;
 
@@ -131,63 +153,102 @@ void loop()
 }
 
 //------------------------------ < Fuction > ----------------------------------------//
-
-int lim_switch(int lim_pin)
-{
-    return !digitalRead(lim_pin);
-}
-
 void task_arduino_fcn(void *arg)
 {
-    pinMode(LIMIT1, INPUT_PULLUP);
-    pinMode(LIMIT2, INPUT_PULLUP);
-    pinMode(LIMIT3, INPUT_PULLUP);
+    motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
+    motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
+    motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
 
-    stepM1.setMaxSpeed(STEP1_SPEED);
-    stepM2.setMaxSpeed(STEP2_SPEED);
-    stepM3.setMaxSpeed(STEP3_SPEED);
-    stepM1.setAcceleration(STEP1_SPEED);
-    stepM2.setAcceleration(STEP2_SPEED);
-    stepM3.setAcceleration(STEP3_SPEED);
-
-    multiStep.addStepper(stepM1);
-    multiStep.addStepper(stepM2);
-    multiStep.addStepper(stepM3);
-
-    servo1.attach(SERVO1);
-    servo2.attach(SERVO2);
-    servo1.write(0);
-    servo2.write(90);
-    positions[0] = 1e6;
-    positions[1] = 1e6;
-    positions[2] = 1e6;
-    multiStep.moveTo(positions);
+    imu.init();
     while (true)
     {
-        if (lim_switch(LIMIT1))
-        {
-            stepM1.setSpeed(0);
-            stepM1.setCurrentPosition(0);
-        }
-        if (lim_switch(LIMIT2))
-        {
-            stepM2.setSpeed(0);
-            stepM2.setCurrentPosition(0);
-        }
-        if (lim_switch(LIMIT3))
-        {
-            stepM3.setSpeed(0);
-            stepM3.setCurrentPosition(0);
-        }
-        if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
-        {
-            pre_positions[0] = positions[0];
-            pre_positions[1] = positions[1];
-            pre_positions[2] = positions[2];
-            multiStep.moveTo(positions);
-        }
-        multiStep.run();
+        /* code */
     }
+}
+
+void moveBase()
+{
+    if (((millis() - prev_velocity_time) >= 200))
+    {
+        velocity_msg.linear.x = 0.0;
+        velocity_msg.linear.y = 0.0;
+        velocity_msg.angular.z = 0.0;
+    }
+
+    Kinematics::rpm req_rpm = kinematics.getRPM(
+        velocity_msg.linear.x,
+        velocity_msg.linear.y,
+        velocity_msg.angular.z);
+
+    float current_rpm1 = motor1_encoder.getRPM();
+    float current_rpm2 = motor2_encoder.getRPM();
+    float current_rpm3 = motor3_encoder.getRPM();
+
+    pwm_msg.linear.x = motor2_pid.compute(req_rpm.motor1, current_rpm1);
+    pwm_msg.linear.y = motor2_pid.compute(req_rpm.motor2, current_rpm2);
+    pwm_msg.linear.z = motor3_pid.compute(req_rpm.motor3, current_rpm3);
+
+    Kinematics::velocities current_vel = kinematics.getVelocities(
+        current_rpm1,
+        current_rpm2,
+        current_rpm3);
+
+    unsigned long now = millis();
+    float vel_dt = (now - prev_odom_update) / 1000.0;
+    prev_odom_update = now;
+    odometry.update(
+        vel_dt,
+        current_vel.linear_x,
+        current_vel.linear_y,
+        current_vel.angular_z);
+}
+
+void syncTime()
+{
+    // get the current time from the agent
+    unsigned long now = millis();
+    RCSOFTCHECK(rmw_uros_sync_session(10));
+    unsigned long long ros_time_ms = rmw_uros_epoch_millis();
+    // now we can find the difference between ROS time and uC time
+    time_offset = ros_time_ms - now;
+}
+
+struct timespec getTime()
+{
+    struct timespec tp = {0};
+    // add time difference between uC time and ROS time to
+    // synchronize time with ROS
+    unsigned long long now = millis() + time_offset;
+    tp.tv_sec = now / 1000;
+    tp.tv_nsec = (now % 1000) * 1000000;
+
+    return tp;
+}
+
+void publishData()
+{
+    debug_msg.linear.x = 0.0;
+    debug_msg.linear.y = 0.0;
+    debug_msg.linear.z = 0.0;
+    debug_msg.angular.x = 0.0;
+    debug_msg.angular.y = 0.0;
+    debug_msg.angular.z = 0.0;
+
+    odom_msg = odometry.getData();
+    imu_msg = imu.getData();
+
+    struct timespec time_stamp = getTime();
+
+    odom_msg.header.stamp.sec = time_stamp.tv_sec;
+    odom_msg.header.stamp.nanosec = time_stamp.tv_nsec;
+
+    imu_msg.header.stamp.sec = time_stamp.tv_sec;
+    imu_msg.header.stamp.nanosec = time_stamp.tv_nsec;
+
+    RCSOFTCHECK(rcl_publish(&pub_pwm, &pwm_msg, NULL));
+    RCSOFTCHECK(rcl_publish(&pub_imu, &imu_msg, NULL));
+    RCSOFTCHECK(rcl_publish(&pub_odom, &odom_msg, NULL));
+    RCSOFTCHECK(rcl_publish(&pub_debug, &debug_msg, NULL));
 }
 
 //------------------------------ < Ros Fuction > ------------------------------------//
@@ -196,11 +257,6 @@ void task_ros_fcn(void *arg)
 {
     Serial.begin(115200);
     set_microros_serial_transports(Serial);
-    pinMode(LED1_PIN, OUTPUT);
-    pinMode(LED2_PIN, OUTPUT);
-
-    digitalWrite(LED1_PIN, LOW);
-    digitalWrite(LED2_PIN, LOW);
     while (true)
     {
         switch (state)
@@ -232,13 +288,10 @@ void task_ros_fcn(void *arg)
 
         if (state == AGENT_CONNECTED)
         {
-            digitalWrite(LED1_PIN, HIGH);
-            digitalWrite(LED2_PIN, HIGH);
+            continue;
         }
         else
         {
-            digitalWrite(LED1_PIN, LOW);
-            digitalWrite(LED2_PIN, HIGH);
             renew();
         }
     }
@@ -270,25 +323,34 @@ bool create_entities()
         &pub_debug,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-        "debug/flag"));
+        "debug/drive/input"));
+    RCCHECK(rclc_publisher_init_default(
+        &pub_pwm,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+        "drive/pwm"));
+    RCCHECK(rclc_publisher_init_default(
+        &pub_odom,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
+        "odom/unfiltered"));
+    RCCHECK(rclc_publisher_init_default(
+        &pub_imu,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+        "imu/data"));
 
     // TODO: create subscriber
     RCCHECK(rclc_subscription_init_default(
-        &sub_position,
+        &sub_velocity,
         &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Pose2D),
-        "gripper/flag/pos"));
-    RCCHECK(rclc_subscription_init_default(
-        &sub_speed,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3),
-        "gripper/flag/speed"));
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+        "cmd_vel"));
 
     // TODO: create executor
     executor = rclc_executor_get_zero_initialized_executor();
-    RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
-    RCCHECK(rclc_executor_add_subscription(&executor, &sub_position, &position_msg, &sub_position_callback, ON_NEW_DATA));
-    RCCHECK(rclc_executor_add_subscription(&executor, &sub_speed, &speed_msg, &sub_speed_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
+    RCCHECK(rclc_executor_add_subscription(&executor, &sub_velocity, &velocity_msg, &sub_velocity_callback, ON_NEW_DATA));
     RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
     return true;
@@ -299,9 +361,11 @@ void destroy_entities()
     rmw_context_t *rmw_context = rcl_context_get_rmw_context(&support.context);
     (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
+    rcl_publisher_fini(&pub_pwm, &node);
+    rcl_publisher_fini(&pub_imu, &node);
+    rcl_publisher_fini(&pub_odom, &node);
     rcl_publisher_fini(&pub_debug, &node);
-    rcl_subscription_fini(&sub_position, &node);
-    rcl_subscription_fini(&sub_speed, &node);
+    rcl_subscription_fini(&sub_velocity, &node);
     rcl_timer_fini(&timer);
     rclc_executor_fini(&executor);
     rcl_node_fini(&node);
@@ -310,8 +374,6 @@ void destroy_entities()
 
 void renew()
 {
-    servo1.write(0);
-    servo2.write(90);
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -321,33 +383,14 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     (void)last_call_time;
     if (timer != NULL)
     {
-        debug_msg.linear.x = stepM1.currentPosition();
-        debug_msg.linear.y = stepM2.currentPosition();
-        debug_msg.linear.z = stepM3.currentPosition();
-        debug_msg.angular.x = stepM1.speed();
-        debug_msg.angular.y = stepM2.speed();
-        debug_msg.angular.z = stepM3.speed();
-        rcl_publish(&pub_debug, &debug_msg, NULL);
+        moveBase();
+        publishData();
     }
 }
 
 //------------------------------ < Subscriber Fuction > -----------------------------//
 
-void sub_position_callback(const void *msgin)
+void sub_velocity_callback(const void *msgin)
 {
-    const geometry_msgs__msg__Pose2D *position_msg = (const geometry_msgs__msg__Pose2D *)msgin;
-    angular = flagGripper.getAngular(position_msg->x, position_msg->y);
-    if ((position_msg->x != 0) || (position_msg->y != 0))
-    {
-        positions[0] = ((float)177000 / 90) * angular.angular_a;
-        positions[1] = ((float)177000 / 90) * angular.angular_b;
-        // positions[2] = position_msg->theta;
-    }
-    // positions[0] = position_msg->x;
-    // positions[1] = position_msg->y;
-}
-
-void sub_speed_callback(const void *msgin)
-{
-    const geometry_msgs__msg__Vector3 *speed_msg = (const geometry_msgs__msg__Vector3 *)msgin;
+    prev_velocity_time = millis();
 }

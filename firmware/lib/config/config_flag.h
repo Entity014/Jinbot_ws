@@ -8,7 +8,7 @@
 
 #define STEP1_SPEED 20000
 #define STEP2_SPEED 20000
-#define STEP3_SPEED 20000
+#define STEP3_SPEED 16000
 #define LENGTH_A 0.293
 #define LENGTH_B 0.352
 #define LENGTH_C 0.352
@@ -27,16 +27,16 @@
 #define STEP2_PWM 13
 #define STEP2_DIR 12
 
-#define STEP3_PWM 16
-#define STEP3_DIR 15
+#define STEP3_PWM 15
+#define STEP3_DIR 14
 
 // ultrasonic pin
-#define TRIGER 17
-#define ECHO 18
+#define TRIGER 16
+#define ECHO 17
 
 // limit switch pin
-#define LIMIT1 34
-#define LIMIT2 35
-#define LIMIT3 36
+#define LIMIT1 32
+#define LIMIT2 33
+#define LIMIT3 35
 
 #endif

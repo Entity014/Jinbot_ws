@@ -15,8 +15,6 @@
 #include <Arduino.h>
 #include "config_drive.h"
 #include "motor.h"
-#define ENCODER_USE_INTERRUPTS
-#define ENCODER_OPTIMIZE_INTERRUPTS
 #include "ESP32Encoder.h"
 #include "kinematics.h"
 
@@ -63,10 +61,10 @@ void setup()
     Serial.println("Type 'sample' and press enter to spin the motors with motor summary.");
     Serial.println("Press enter to clear command.");
     Serial.println("");
-    encoders[0]->attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_A);
-    encoders[1]->attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_A);
-    encoders[2]->attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_A);
-    encoders[3]->attachSingleEdge(MOTOR4_ENCODER_A, MOTOR4_ENCODER_A);
+    encoders[0]->attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
+    encoders[1]->attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
+    encoders[2]->attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
+    encoders[3]->attachSingleEdge(MOTOR4_ENCODER_A, MOTOR4_ENCODER_B);
 }
 
 void loop()
