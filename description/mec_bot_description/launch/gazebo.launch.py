@@ -23,7 +23,7 @@ def generate_launch_description():
     )
 
     world_path = PathJoinSubstitution(
-        [FindPackageShare("mec_bot_description"), "worlds", "turtlebot3_world.world"]
+        [FindPackageShare("mec_bot_description"), "worlds", "jinpao3d_map.world"]
     )
 
     description_launch_path = PathJoinSubstitution(
@@ -52,7 +52,7 @@ def generate_launch_description():
                 executable="spawn_entity.py",
                 name="urdf_spawner",
                 output="screen",
-                arguments=["-topic", "robot_description", "-entity", "mec_bot"],
+                arguments=["-topic", "robot_description", "-entity", "mec_bot", "-x", "4", "-y", "-3", "-z" , "0.1"],
             ),
             Node(
                 package="mec_bot_description",

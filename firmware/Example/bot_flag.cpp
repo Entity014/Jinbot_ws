@@ -13,8 +13,8 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <geometry_msgs/msg/pose2_d.h>
 #include <geometry_msgs/msg/vector3.h>
+#include <geometry_msgs/msg/point.h>
 #include <geometry_msgs/msg/twist.h>
 
 #define RCCHECK(fn)                  \
@@ -68,7 +68,7 @@ void task_arduino_fcn(void *arg);
 void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
 void sub_position_callback(const void *msgin);
-void sub_speed_callback(const void *msgin);
+void sub_hand_callback(const void *msgin);
 bool create_entities();
 void destroy_entities();
 void renew();
@@ -82,8 +82,8 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
-geometry_msgs__msg__Pose2D position_msg;
-geometry_msgs__msg__Vector3 speed_msg;
+geometry_msgs__msg__Point position_msg;
+geometry_msgs__msg__Vector3 hand_msg;
 geometry_msgs__msg__Twist debug_msg;
 
 // ? define publisher
@@ -91,7 +91,7 @@ rcl_publisher_t pub_debug;
 
 // ? define subscriber
 rcl_subscription_t sub_position;
-rcl_subscription_t sub_speed;
+rcl_subscription_t sub_hand;
 
 rcl_init_options_t init_options;
 
@@ -276,19 +276,19 @@ bool create_entities()
     RCCHECK(rclc_subscription_init_default(
         &sub_position,
         &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Pose2D),
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Point),
         "gripper/flag/pos"));
     RCCHECK(rclc_subscription_init_default(
-        &sub_speed,
+        &sub_hand,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3),
-        "gripper/flag/speed"));
+        "gripper/flag/hand"));
 
     // TODO: create executor
     executor = rclc_executor_get_zero_initialized_executor();
     RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
     RCCHECK(rclc_executor_add_subscription(&executor, &sub_position, &position_msg, &sub_position_callback, ON_NEW_DATA));
-    RCCHECK(rclc_executor_add_subscription(&executor, &sub_speed, &speed_msg, &sub_speed_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_add_subscription(&executor, &sub_hand, &hand_msg, &sub_hand_callback, ON_NEW_DATA));
     RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
     return true;
@@ -301,7 +301,7 @@ void destroy_entities()
 
     rcl_publisher_fini(&pub_debug, &node);
     rcl_subscription_fini(&sub_position, &node);
-    rcl_subscription_fini(&sub_speed, &node);
+    rcl_subscription_fini(&sub_hand, &node);
     rcl_timer_fini(&timer);
     rclc_executor_fini(&executor);
     rcl_node_fini(&node);
@@ -335,19 +335,21 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
 
 void sub_position_callback(const void *msgin)
 {
-    const geometry_msgs__msg__Pose2D *position_msg = (const geometry_msgs__msg__Pose2D *)msgin;
+    const geometry_msgs__msg__Point *position_msg = (const geometry_msgs__msg__Point *)msgin;
     angular = flagGripper.getAngular(position_msg->x, position_msg->y);
     if ((position_msg->x != 0) || (position_msg->y != 0))
     {
         positions[0] = ((float)177000 / 90) * angular.angular_a;
         positions[1] = ((float)177000 / 90) * angular.angular_b;
-        // positions[2] = position_msg->theta;
+        // positions[2] = position_msg->z;
     }
     // positions[0] = position_msg->x;
     // positions[1] = position_msg->y;
 }
 
-void sub_speed_callback(const void *msgin)
+void sub_hand_callback(const void *msgin)
 {
-    const geometry_msgs__msg__Vector3 *speed_msg = (const geometry_msgs__msg__Vector3 *)msgin;
+    const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
+    servo1.write(hand_msg->x);
+    servo2.write(hand_msg->y);
 }

@@ -243,10 +243,6 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     (void)last_call_time;
     if (timer != NULL)
     {
-        debug_msg.linear.x = 0.0;
-        debug_msg.linear.y = 0.0;
-        debug_msg.linear.z = 0.0;
-        debug_msg.angular.x = 0.0;
         debug_msg.angular.y = 0.0;
         debug_msg.angular.z = 0.0;
         rcl_publish(&pub_debug, &debug_msg, NULL);
@@ -257,8 +253,12 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
 void sub_pwm_callback(const void *msgin)
 {
     const geometry_msgs__msg__Twist *pwm_msg = (const geometry_msgs__msg__Twist *)msgin;
-    motor1_controller.spin((int)pwm_msg);
-    motor2_controller.spin((int)pwm_msg);
-    motor3_controller.spin((int)pwm_msg);
-    motor4_controller.spin((int)pwm_msg);
+    debug_msg.linear.x = pwm_msg->linear.x;
+    debug_msg.linear.y = pwm_msg->linear.y;
+    debug_msg.linear.z = pwm_msg->linear.z;
+    debug_msg.angular.x = pwm_msg->angular.x;
+    motor1_controller.spin((int)pwm_msg->linear.x);
+    motor2_controller.spin((int)pwm_msg->linear.y);
+    motor3_controller.spin((int)pwm_msg->linear.z);
+    motor4_controller.spin((int)pwm_msg->angular.x);
 }

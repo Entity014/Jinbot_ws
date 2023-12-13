@@ -22,7 +22,7 @@ find_package(rclpy REQUIRED)
 ament_python_install_package(src)
 
 install(
-  DIRECTORY launch rviz config urdf worlds src
+  DIRECTORY launch rviz config urdf worlds src maps
   DESTINATION share/${PROJECT_NAME}
 )
 

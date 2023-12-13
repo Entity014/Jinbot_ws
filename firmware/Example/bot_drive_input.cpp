@@ -184,9 +184,11 @@ void moveBase()
     float current_rpm2 = motor2_encoder.getRPM();
     float current_rpm3 = motor3_encoder.getRPM();
 
-    pwm_msg.linear.x = motor2_pid.compute(req_rpm.motor1, current_rpm1);
-    pwm_msg.linear.y = motor2_pid.compute(req_rpm.motor2, current_rpm2);
-    pwm_msg.linear.z = motor3_pid.compute(req_rpm.motor3, current_rpm3);
+    Kinematics::pwm motor_pwm = kinematics.getPWM(motor1_pid.compute(req_rpm.motor1, current_rpm1), motor2_pid.compute(req_rpm.motor2, current_rpm2), motor3_pid.compute(req_rpm.motor3, current_rpm3));
+    pwm_msg.linear.x = motor_pwm.motor1;
+    pwm_msg.linear.y = motor_pwm.motor2;
+    pwm_msg.linear.z = motor_pwm.motor3;
+    pwm_msg.angular.x = motor_pwm.motor4;
 
     Kinematics::velocities current_vel = kinematics.getVelocities(
         current_rpm1,

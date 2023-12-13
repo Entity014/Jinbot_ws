@@ -26,6 +26,7 @@ setup(
         "console_scripts": [
             "drive_node = jinbot_core.bot_drive:main",
             "flag_node = jinbot_core.bot_flaggripper:main",
+            "joy_node = jinbot_core.joy_drive:main",
         ],
     },
 )
