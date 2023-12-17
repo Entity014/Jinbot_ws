@@ -1,19 +1,21 @@
 #include <micro_ros_platformio.h>
 #include <Arduino.h>
 #include <stdio.h>
+#include <ESP32_Servo.h>
+#include <AccelStepper.h>
+#include <MultiStepper.h>
 
-#include <config_drive_output.h>
-#include <motor.h>
+#include <config_flag.h>
+#include <gripper.h>
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <nav_msgs/msg/odometry.h>
-#include <sensor_msgs/msg/imu.h>
-#include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/vector3.h>
+#include <geometry_msgs/msg/point.h>
+#include <geometry_msgs/msg/twist.h>
 
 #define RCCHECK(fn)              \
   {                              \
@@ -39,21 +41,34 @@
   } while (0)
 
 //------------------------------ < ESP32 Define > -----------------------------------//
+static uint32_t preT = 0;
+bool preTS = false;
 
-Motor motor1_controller(PWM_FREQUENCY, PWM_BITS, MOTOR1_INV, MOTOR1_PWM, MOTOR1_IN_A, MOTOR1_IN_B);
-Motor motor2_controller(PWM_FREQUENCY, PWM_BITS, MOTOR2_INV, MOTOR2_PWM, MOTOR2_IN_A, MOTOR2_IN_B);
-Motor motor3_controller(PWM_FREQUENCY, PWM_BITS, MOTOR3_INV, MOTOR3_PWM, MOTOR3_IN_A, MOTOR3_IN_B);
-Motor motor4_controller(PWM_FREQUENCY, PWM_BITS, MOTOR4_INV, MOTOR4_PWM, MOTOR4_IN_A, MOTOR4_IN_B);
+long positions[3];
+long pre_positions[3];
+
+Servo servo1;
+Servo servo2;
+
+AccelStepper stepM1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
+AccelStepper stepM2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
+AccelStepper stepM3(AccelStepper::DRIVER, STEP3_PWM, STEP3_DIR);
+MultiStepper multiStep;
+
+Parallel_3dof::angular angular;
+Parallel_3dof flagGripper(LENGTH_A, LENGTH_B, LENGTH_C, LENGTH_D, LENGTH_E, LENGTH_F);
 
 //------------------------------ < Fuction Prototype > ------------------------------//
 
+int lim_switch(int lim_pin);
 void task_arduino_fcn(void *arg);
 
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
 void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
-void sub_pwm_callback(const void *msgin);
+void sub_position_callback(const void *msgin);
+void sub_hand_callback(const void *msgin);
 bool create_entities();
 void destroy_entities();
 void renew();
@@ -67,14 +82,16 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
+geometry_msgs__msg__Point position_msg;
+geometry_msgs__msg__Vector3 hand_msg;
 geometry_msgs__msg__Twist debug_msg;
-geometry_msgs__msg__Twist pwm_msg;
 
 // ? define publisher
 rcl_publisher_t pub_debug;
 
 // ? define subscriber
-rcl_subscription_t sub_pwm;
+rcl_subscription_t sub_position;
+rcl_subscription_t sub_hand;
 
 rcl_init_options_t init_options;
 
@@ -115,10 +132,61 @@ void loop()
 
 //------------------------------ < Fuction > ----------------------------------------//
 
+int lim_switch(int lim_pin)
+{
+  return !digitalRead(lim_pin);
+}
+
 void task_arduino_fcn(void *arg)
 {
+  pinMode(LIMIT1, INPUT_PULLUP);
+  pinMode(LIMIT2, INPUT_PULLUP);
+  pinMode(LIMIT3, INPUT_PULLUP);
+
+  stepM1.setMaxSpeed(STEP1_SPEED);
+  stepM2.setMaxSpeed(STEP2_SPEED);
+  stepM3.setMaxSpeed(STEP3_SPEED);
+  stepM1.setAcceleration(STEP1_SPEED);
+  stepM2.setAcceleration(STEP2_SPEED);
+  stepM3.setAcceleration(STEP3_SPEED);
+
+  multiStep.addStepper(stepM1);
+  multiStep.addStepper(stepM2);
+  multiStep.addStepper(stepM3);
+
+  servo1.attach(SERVO1);
+  servo2.attach(SERVO2);
+  servo1.write(0);
+  servo2.write(90);
+  positions[0] = 1e6;
+  positions[1] = 1e6;
+  positions[2] = 1e6;
+  multiStep.moveTo(positions);
   while (true)
   {
+    if (lim_switch(LIMIT1))
+    {
+      stepM1.setSpeed(0);
+      stepM1.setCurrentPosition(0);
+    }
+    if (lim_switch(LIMIT2))
+    {
+      stepM2.setSpeed(0);
+      stepM2.setCurrentPosition(0);
+    }
+    if (lim_switch(LIMIT3))
+    {
+      stepM3.setSpeed(0);
+      stepM3.setCurrentPosition(0);
+    }
+    if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
+    {
+      pre_positions[0] = positions[0];
+      pre_positions[1] = positions[1];
+      pre_positions[2] = positions[2];
+      multiStep.moveTo(positions);
+    }
+    multiStep.run();
   }
 }
 
@@ -165,7 +233,7 @@ void task_ros_fcn(void *arg)
     if (state == AGENT_CONNECTED)
     {
       digitalWrite(LED1_PIN, HIGH);
-      digitalWrite(LED2_PIN, HIGH);
+      digitalWrite(LED2_PIN, LOW);
     }
     else
     {
@@ -202,19 +270,25 @@ bool create_entities()
       &pub_debug,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-      "debug/drive/output"));
+      "debug/flag"));
 
   // TODO: create subscriber
   RCCHECK(rclc_subscription_init_default(
-      &sub_pwm,
+      &sub_position,
       &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-      "drive/pwm"));
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Point),
+      "gripper/flag/pos"));
+  RCCHECK(rclc_subscription_init_default(
+      &sub_hand,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3),
+      "gripper/flag/hand"));
 
   // TODO: create executor
   executor = rclc_executor_get_zero_initialized_executor();
-  RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
-  RCCHECK(rclc_executor_add_subscription(&executor, &sub_pwm, &pwm_msg, &sub_pwm_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sub_position, &position_msg, &sub_position_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sub_hand, &hand_msg, &sub_hand_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
   return true;
@@ -226,7 +300,8 @@ void destroy_entities()
   (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
   rcl_publisher_fini(&pub_debug, &node);
-  rcl_subscription_fini(&sub_pwm, &node);
+  rcl_subscription_fini(&sub_position, &node);
+  rcl_subscription_fini(&sub_hand, &node);
   rcl_timer_fini(&timer);
   rclc_executor_fini(&executor);
   rcl_node_fini(&node);
@@ -235,6 +310,8 @@ void destroy_entities()
 
 void renew()
 {
+  servo1.write(0);
+  servo2.write(90);
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -244,22 +321,35 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
   (void)last_call_time;
   if (timer != NULL)
   {
-    debug_msg.angular.y = 0.0;
-    debug_msg.angular.z = 0.0;
+    debug_msg.linear.x = stepM1.currentPosition();
+    debug_msg.linear.y = stepM2.currentPosition();
+    debug_msg.linear.z = stepM3.currentPosition();
+    debug_msg.angular.x = stepM1.speed();
+    debug_msg.angular.y = stepM2.speed();
+    debug_msg.angular.z = stepM3.speed();
     rcl_publish(&pub_debug, &debug_msg, NULL);
   }
 }
 
 //------------------------------ < Subscriber Fuction > -----------------------------//
-void sub_pwm_callback(const void *msgin)
+
+void sub_position_callback(const void *msgin)
 {
-  const geometry_msgs__msg__Twist *pwm_msg = (const geometry_msgs__msg__Twist *)msgin;
-  debug_msg.linear.x = pwm_msg->linear.x;
-  debug_msg.linear.y = pwm_msg->linear.y;
-  debug_msg.linear.z = pwm_msg->linear.z;
-  debug_msg.angular.x = pwm_msg->angular.x;
-  motor1_controller.spin((int)pwm_msg->linear.x);
-  motor2_controller.spin((int)pwm_msg->linear.y);
-  motor3_controller.spin((int)pwm_msg->linear.z);
-  motor4_controller.spin((int)pwm_msg->angular.x);
+  const geometry_msgs__msg__Point *position_msg = (const geometry_msgs__msg__Point *)msgin;
+  angular = flagGripper.getAngular(position_msg->x, position_msg->y);
+  if ((position_msg->x != 0) || (position_msg->y != 0))
+  {
+    positions[0] = ((float)177000 / 90) * angular.angular_a;
+    positions[1] = ((float)177000 / 90) * angular.angular_b;
+    // positions[2] = position_msg->z;
+  }
+  // positions[0] = position_msg->x;
+  // positions[1] = position_msg->y;
+}
+
+void sub_hand_callback(const void *msgin)
+{
+  const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
+  servo1.write(hand_msg->x);
+  servo2.write(hand_msg->y);
 }

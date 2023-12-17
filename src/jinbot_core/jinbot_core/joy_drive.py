@@ -4,7 +4,7 @@ import numpy as np
 
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Vector3
 from rclpy import qos
 
 
@@ -19,6 +19,9 @@ class Ps4(Node):
         self.sent_drive = self.create_publisher(
             Twist, "drive/pwm", qos_profile=qos.qos_profile_system_default
         )
+        # self.sent_flag_theta = self.create_publisher(
+        #     Vector3, "gripper/flag/hand", qos_profile=qos.qos_profile_system_default
+        # )
         self.sent_drive_timer = self.create_timer(0.05, self.sent_drive_callback)
 
         self.all = [
@@ -45,6 +48,8 @@ class Ps4(Node):
 
         self.button["L2"] = 0
         self.button["R2"] = 0
+        self.theta1 = 0.0
+        self.theta2 = 0.0
 
     def sub_callback(self, msg_in):  # subscription topic
         self.new_dat = msg_in
@@ -69,8 +74,8 @@ class Ps4(Node):
                 self.axes[element] = msg_in.axes[index]
 
     def sent_drive_callback(self):  # publisher drive topic
-        limit = 0.1
         msg = Twist()
+        msg_theta = Vector3()
 
         x = 0.0
         y = 0.0
@@ -110,10 +115,14 @@ class Ps4(Node):
         msg.linear.z = float(round(leftBack * 1023))
         msg.angular.x = float(round(rightBack * 1023))
 
-        self.get_logger().info(
-            f"{msg.linear.x} {msg.linear.y} {msg.linear.z} {msg.angular.x}"
-        )
+        if self.button["X"] == 1:
+            msg_theta.x = 90.0
+
+        # self.get_logger().info(
+        #     f"{msg.linear.x} {msg.linear.y} {msg.linear.z} {msg.angular.x}"
+        # )
         self.sent_drive.publish(msg)
+        # self.sent_flag_theta.publish(msg_theta)
 
 
 def main():

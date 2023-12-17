@@ -165,7 +165,7 @@ void task_ros_fcn(void *arg)
         if (state == AGENT_CONNECTED)
         {
             digitalWrite(LED1_PIN, HIGH);
-            digitalWrite(LED2_PIN, HIGH);
+            digitalWrite(LED2_PIN, LOW);
         }
         else
         {
@@ -213,7 +213,8 @@ bool create_entities()
 
     // TODO: create executor
     executor = rclc_executor_get_zero_initialized_executor();
-    RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+    RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
+    RCCHECK(rclc_executor_add_subscription(&executor, &sub_pwm, &pwm_msg, &sub_pwm_callback, ON_NEW_DATA));
     RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
     return true;

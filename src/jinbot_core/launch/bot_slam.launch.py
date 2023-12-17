@@ -16,7 +16,7 @@ def generate_launch_description():
     )
 
     slam_config_path = PathJoinSubstitution(
-        [FindPackageShare("mec_bot_description"), "config", "slam.yaml"]
+        [FindPackageShare("jinbot_core"), "config", "slam.yaml"]
     )
 
     navigation_launch_path = PathJoinSubstitution(
@@ -24,11 +24,11 @@ def generate_launch_description():
     )
 
     nav2_config_path = PathJoinSubstitution(
-        [FindPackageShare("mec_bot_description"), "config", "navigation.yaml"]
+        [FindPackageShare("jinbot_core"), "config", "navigation.yaml"]
     )
 
     rviz_config_path = PathJoinSubstitution(
-        [FindPackageShare("mec_bot_description"), "rviz", "mec_bot_slam.rviz"]
+        [FindPackageShare("jinbot_core"), "rviz", "jinbot_slam.rviz"]
     )
 
     lc = LaunchContext()
@@ -69,6 +69,12 @@ def generate_launch_description():
                 arguments=["-d", rviz_config_path],
                 condition=IfCondition(LaunchConfiguration("rviz")),
                 parameters=[{"use_sim_time": LaunchConfiguration("sim")}],
+            ),
+            Node(
+                package="micro_ros_agent",
+                executable="micro_ros_agent",
+                output="screen",
+                arguments=["serial", "--dev", "/dev/ttyUSB0"],
             ),
         ]
     )

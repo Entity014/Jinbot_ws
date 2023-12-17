@@ -21,7 +21,7 @@ from launch.conditions import IfCondition
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
-MAP_NAME='jinpao_blue' #change to the name of your own map here
+MAP_NAME='jinpao_blue2' #change to the name of your own map here
 
 def generate_launch_description():
     depth_sensor = os.getenv('MECBOT_DEPTH_SENSOR', '')
@@ -51,7 +51,7 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             name='rviz', 
-            default_value='false',
+            default_value='true',
             description='Run rviz'
         ),
 

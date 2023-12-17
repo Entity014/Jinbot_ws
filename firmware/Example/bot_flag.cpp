@@ -233,7 +233,7 @@ void task_ros_fcn(void *arg)
         if (state == AGENT_CONNECTED)
         {
             digitalWrite(LED1_PIN, HIGH);
-            digitalWrite(LED2_PIN, HIGH);
+            digitalWrite(LED2_PIN, LOW);
         }
         else
         {
