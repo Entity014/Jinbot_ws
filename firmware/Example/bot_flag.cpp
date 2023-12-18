@@ -82,9 +82,9 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
-geometry_msgs__msg__Point position_msg;
-geometry_msgs__msg__Vector3 hand_msg;
 geometry_msgs__msg__Twist debug_msg;
+geometry_msgs__msg__Vector3 hand_msg;
+geometry_msgs__msg__Point position_msg;
 
 // ? define publisher
 rcl_publisher_t pub_debug;

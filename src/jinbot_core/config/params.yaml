@@ -19,3 +19,10 @@ flag_grip_node:
       x: 0.0
       y: 0.0
       z: 0.0
+
+bot_state_node:
+  ros__parameters:
+    main_ros: 1
+    main: "Idle"
+    team: "Blue"
+    retry: "None"

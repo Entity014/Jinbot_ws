@@ -14,8 +14,10 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <nav_msgs/msg/odometry.h>
+#include <std_msgs/msg/int8.h>
+#include <std_msgs/msg/string.h>
 #include <sensor_msgs/msg/imu.h>
+#include <nav_msgs/msg/odometry.h>
 #include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/vector3.h>
 
@@ -81,6 +83,8 @@ void moveBase();
 void syncTime();
 void publishData();
 struct timespec getTime();
+int lim_switch(int lim_pin);
+String get_color(int value);
 
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
@@ -100,6 +104,10 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
+std_msgs__msg__Int8 start_msg;
+std_msgs__msg__Int8 team_msg;
+std_msgs__msg__Int8 retry_msg;
+std_msgs__msg__String color_msg;
 sensor_msgs__msg__Imu imu_msg;
 nav_msgs__msg__Odometry odom_msg;
 geometry_msgs__msg__Twist pwm_msg;
@@ -111,6 +119,10 @@ rcl_publisher_t pub_debug;
 rcl_publisher_t pub_odom;
 rcl_publisher_t pub_imu;
 rcl_publisher_t pub_pwm;
+rcl_publisher_t pub_start;
+rcl_publisher_t pub_team;
+rcl_publisher_t pub_retry;
+rcl_publisher_t pub_color;
 
 // ? define subscriber
 rcl_subscription_t sub_velocity;
@@ -158,12 +170,27 @@ void task_arduino_fcn(void *arg)
     motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
     motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
     motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
+    pinMode(START_BUTTON, INPUT_PULLUP);
+    pinMode(TEAM_BUTTON, INPUT_PULLUP);
+    pinMode(RETRY_BUTTON, INPUT_PULLUP);
+    pinMode(COLOR, INPUT);
 
     imu.init();
     while (true)
     {
         /* code */
     }
+}
+
+int lim_switch(int lim_pin)
+{
+    return !digitalRead(lim_pin);
+}
+
+String get_color(int value)
+{
+    return (value < 1000) ? "Blue" : (value < 2000) ? "Green"
+                                                    : "Yellow";
 }
 
 void moveBase()
@@ -183,6 +210,12 @@ void moveBase()
     float current_rpm1 = motor1_encoder.getRPM();
     float current_rpm2 = motor2_encoder.getRPM();
     float current_rpm3 = motor3_encoder.getRPM();
+    debug_msg.linear.x = current_rpm1;
+    debug_msg.linear.y = current_rpm2;
+    debug_msg.linear.z = current_rpm3;
+    debug_msg.angular.x = req_rpm.motor1;
+    debug_msg.angular.y = req_rpm.motor2;
+    debug_msg.angular.z = req_rpm.motor3;
 
     Kinematics::pwm motor_pwm = kinematics.getPWM(motor1_pid.compute(req_rpm.motor1, current_rpm1), motor2_pid.compute(req_rpm.motor2, current_rpm2), motor3_pid.compute(req_rpm.motor3, current_rpm3));
     pwm_msg.linear.x = motor_pwm.motor1;
@@ -229,15 +262,14 @@ struct timespec getTime()
 
 void publishData()
 {
-    debug_msg.linear.x = 0.0;
-    debug_msg.linear.y = 0.0;
-    debug_msg.linear.z = 0.0;
-    debug_msg.angular.x = 0.0;
-    debug_msg.angular.y = 0.0;
-    debug_msg.angular.z = 0.0;
 
     odom_msg = odometry.getData();
     imu_msg = imu.getData();
+
+    start_msg.data = lim_switch(START_BUTTON);
+    team_msg.data = lim_switch(TEAM_BUTTON);
+    retry_msg.data = lim_switch(RETRY_BUTTON);
+    color_msg.data.data = (char *)get_color(analogRead(COLOR)).c_str();
 
     struct timespec time_stamp = getTime();
 
@@ -249,8 +281,11 @@ void publishData()
 
     RCSOFTCHECK(rcl_publish(&pub_pwm, &pwm_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pub_imu, &imu_msg, NULL));
+    RCSOFTCHECK(rcl_publish(&pub_team, &team_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pub_odom, &odom_msg, NULL));
+    RCSOFTCHECK(rcl_publish(&pub_start, &start_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pub_debug, &debug_msg, NULL));
+    RCSOFTCHECK(rcl_publish(&pub_retry, &retry_msg, NULL));
 }
 
 //------------------------------ < Ros Fuction > ------------------------------------//
@@ -341,6 +376,26 @@ bool create_entities()
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
         "imu/data"));
+    RCCHECK(rclc_publisher_init_default(
+        &pub_start,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
+        "button/start"));
+    RCCHECK(rclc_publisher_init_default(
+        &pub_team,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
+        "button/team"));
+    RCCHECK(rclc_publisher_init_default(
+        &pub_retry,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
+        "button/retry"));
+    RCCHECK(rclc_publisher_init_default(
+        &pub_color,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
+        "color/floor"));
 
     // TODO: create subscriber
     RCCHECK(rclc_subscription_init_default(
@@ -365,7 +420,11 @@ void destroy_entities()
 
     rcl_publisher_fini(&pub_pwm, &node);
     rcl_publisher_fini(&pub_imu, &node);
+    rcl_publisher_fini(&pub_team, &node);
     rcl_publisher_fini(&pub_odom, &node);
+    rcl_publisher_fini(&pub_start, &node);
+    rcl_publisher_fini(&pub_retry, &node);
+    rcl_publisher_fini(&pub_color, &node);
     rcl_publisher_fini(&pub_debug, &node);
     rcl_subscription_fini(&sub_velocity, &node);
     rcl_timer_fini(&timer);

@@ -10,8 +10,9 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <nav_msgs/msg/odometry.h>
+#include <std_msgs/msg/string.h>
 #include <sensor_msgs/msg/imu.h>
+#include <nav_msgs/msg/odometry.h>
 #include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/vector3.h>
 
@@ -54,6 +55,9 @@ void task_arduino_fcn(void *arg);
 void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
 void sub_pwm_callback(const void *msgin);
+void sub_main_callback(const void *msgin);
+void sub_team_callback(const void *msgin);
+void sub_retry_callback(const void *msgin);
 bool create_entities();
 void destroy_entities();
 void renew();
@@ -67,6 +71,9 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
+std_msgs__msg__String main_msg;
+std_msgs__msg__String team_msg;
+std_msgs__msg__String retry_msg;
 geometry_msgs__msg__Twist debug_msg;
 geometry_msgs__msg__Twist pwm_msg;
 
@@ -75,6 +82,9 @@ rcl_publisher_t pub_debug;
 
 // ? define subscriber
 rcl_subscription_t sub_pwm;
+rcl_subscription_t sub_main;
+rcl_subscription_t sub_team;
+rcl_subscription_t sub_retry;
 
 rcl_init_options_t init_options;
 
@@ -117,8 +127,59 @@ void loop()
 
 void task_arduino_fcn(void *arg)
 {
+    pinMode(LED1_PIN, OUTPUT);
+    pinMode(LED2_PIN, OUTPUT);
+    pinMode(RLED1_PIN, OUTPUT);
+    pinMode(GLED1_PIN, OUTPUT);
+    pinMode(BLED1_PIN, OUTPUT);
+    pinMode(RLED2_PIN, OUTPUT);
+    pinMode(GLED2_PIN, OUTPUT);
+    pinMode(BLED2_PIN, OUTPUT);
     while (true)
     {
+        if (main_msg.data.data == "Reset")
+        {
+            analogWrite(RLED1_PIN, 1023);
+            analogWrite(GLED1_PIN, 1023);
+            analogWrite(BLED1_PIN, 0);
+            analogWrite(RLED2_PIN, 1023);
+            analogWrite(GLED2_PIN, 1023);
+            analogWrite(BLED2_PIN, 0);
+        }
+        else
+        {
+            if (team_msg.data.data == "Blue")
+            {
+                analogWrite(RLED1_PIN, 0);
+                analogWrite(GLED1_PIN, 0);
+                analogWrite(BLED1_PIN, 1023);
+            }
+            else if (team_msg.data.data == "Red")
+            {
+                analogWrite(RLED1_PIN, 1023);
+                analogWrite(GLED1_PIN, 0);
+                analogWrite(BLED1_PIN, 0);
+            }
+
+            if (retry_msg.data.data == "First")
+            {
+                analogWrite(RLED2_PIN, 0);
+                analogWrite(GLED2_PIN, 0);
+                analogWrite(BLED2_PIN, 1023);
+            }
+            else if (retry_msg.data.data == "Second")
+            {
+                analogWrite(RLED2_PIN, 1023);
+                analogWrite(GLED2_PIN, 0);
+                analogWrite(BLED2_PIN, 0);
+            }
+            else
+            {
+                analogWrite(RLED2_PIN, 0);
+                analogWrite(GLED2_PIN, 0);
+                analogWrite(BLED2_PIN, 0);
+            }
+        }
     }
 }
 
@@ -128,8 +189,6 @@ void task_ros_fcn(void *arg)
 {
     Serial.begin(115200);
     set_microros_serial_transports(Serial);
-    pinMode(LED1_PIN, OUTPUT);
-    pinMode(LED2_PIN, OUTPUT);
 
     digitalWrite(LED1_PIN, LOW);
     digitalWrite(LED2_PIN, LOW);
@@ -210,11 +269,29 @@ bool create_entities()
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
         "drive/pwm"));
+    RCCHECK(rclc_subscription_init_default(
+        &sub_main,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
+        "state/main"));
+    RCCHECK(rclc_subscription_init_default(
+        &sub_team,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
+        "state/team"));
+    RCCHECK(rclc_subscription_init_default(
+        &sub_retry,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
+        "state/retry"));
 
     // TODO: create executor
     executor = rclc_executor_get_zero_initialized_executor();
-    RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
+    RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
     RCCHECK(rclc_executor_add_subscription(&executor, &sub_pwm, &pwm_msg, &sub_pwm_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_add_subscription(&executor, &sub_main, &main_msg, &sub_main_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_add_subscription(&executor, &sub_team, &team_msg, &sub_team_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_add_subscription(&executor, &sub_retry, &retry_msg, &sub_retry_callback, ON_NEW_DATA));
     RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
     return true;
@@ -262,4 +339,19 @@ void sub_pwm_callback(const void *msgin)
     motor2_controller.spin((int)pwm_msg->linear.y);
     motor3_controller.spin((int)pwm_msg->linear.z);
     motor4_controller.spin((int)pwm_msg->angular.x);
+}
+
+void sub_main_callback(const void *msgin)
+{
+    const std_msgs__msg__String *main_msg = (const std_msgs__msg__String *)msgin;
+}
+
+void sub_team_callback(const void *msgin)
+{
+    const std_msgs__msg__String *team_msg = (const std_msgs__msg__String *)msgin;
+}
+
+void sub_retry_callback(const void *msgin)
+{
+    const std_msgs__msg__String *retry_msg = (const std_msgs__msg__String *)msgin;
 }

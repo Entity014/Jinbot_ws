@@ -39,6 +39,7 @@ def generate_launch_description():
         package="jinbot_core", executable="drive_node", parameters=[config]
     )
     node_flag = Node(package="jinbot_core", executable="flag_node", parameters=[config])
+    node_state = Node(package="jinbot_core", executable="state_node")
     node_joy = Node(package="joy", executable="joy_node")
     node_joyd = Node(package="jinbot_core", executable="joy_node")
 
@@ -50,5 +51,6 @@ def generate_launch_description():
     ld.add_action(node_joyd)
     ld.add_action(node_drive)
     ld.add_action(node_flag)
+    ld.add_action(node_state)
 
     return ld

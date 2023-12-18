@@ -30,10 +30,6 @@
 #define STEP3_PWM 15
 #define STEP3_DIR 14
 
-// ultrasonic pin
-#define TRIGER 16
-#define ECHO 17
-
 // limit switch pin
 #define LIMIT1 32
 #define LIMIT2 33
