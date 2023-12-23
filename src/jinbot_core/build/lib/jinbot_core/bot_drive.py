@@ -3,7 +3,7 @@ import numpy as np
 
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from rclpy import qos
+from rclpy import qos, Parameter
 
 
 class BotDrive(Node):
@@ -14,7 +14,25 @@ class BotDrive(Node):
         )
         self.sent_drive_timer = self.create_timer(0.05, self.drive_callback)
 
-        self.declare_parameters("", [("speed_motor", None)])
+        self.declare_parameters(
+            "",
+            [
+                ("speed.x", Parameter.Type.DOUBLE),
+                ("speed.y", Parameter.Type.DOUBLE),
+                ("speed.z", Parameter.Type.DOUBLE),
+                ("rotation.x", Parameter.Type.DOUBLE),
+                ("rotation.y", Parameter.Type.DOUBLE),
+                ("rotation.z", Parameter.Type.DOUBLE),
+            ],
+        )
+        self.speed_x = 0.0
+        self.speed_y = 0.0
+        self.speed_z = 0.0
+        self.rotation_x = 0.0
+        self.rotation_y = 0.0
+        self.rotation_z = 0.0
+
+    def drive_callback(self):
         self.speed_x = self.get_parameter("speed.x").get_parameter_value().double_value
         self.speed_y = self.get_parameter("speed.y").get_parameter_value().double_value
         self.speed_z = self.get_parameter("speed.z").get_parameter_value().double_value
@@ -27,8 +45,6 @@ class BotDrive(Node):
         self.rotation_z = (
             self.get_parameter("rotation.z").get_parameter_value().double_value
         )
-
-    def drive_callback(self):
         msg = Twist()
 
         msg.linear.x = self.speed_x
@@ -38,7 +54,7 @@ class BotDrive(Node):
         msg.angular.y = self.rotation_y
         msg.angular.z = self.rotation_z
 
-        self.get_logger().info(f"{self.speed_x}")
+        # self.get_logger().info(f"{self.speed_x}")
 
         self.sent_drive.publish(msg)
 

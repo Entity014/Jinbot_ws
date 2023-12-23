@@ -8,7 +8,7 @@
 #define BLED1_PIN 23
 #define RLED2_PIN 25
 #define GLED2_PIN 26
-#define BLED2_PIN 27
+#define BLED2_PIN -1
 
 #define USE_PRIK_KEE_NOO_DRIVER // Motor drivers with 2 Direction Pins(INA, INB) and 1 PWM(ENABLE)
 
@@ -29,13 +29,13 @@ ROBOT ORIENTATION
 #define MOTOR4_INV false
 
 #ifdef USE_PRIK_KEE_NOO_DRIVER
-#define MOTOR1_PWM 2
-#define MOTOR1_IN_A 0
-#define MOTOR1_IN_B 18
+#define MOTOR1_PWM 14
+#define MOTOR1_IN_A 12
+#define MOTOR1_IN_B 13
 
-#define MOTOR2_PWM 5
-#define MOTOR2_IN_A 19
-#define MOTOR2_IN_B 4
+#define MOTOR2_PWM 17
+#define MOTOR2_IN_A 15
+#define MOTOR2_IN_B 16
 
 #define MOTOR3_PWM 14
 #define MOTOR3_IN_A 12

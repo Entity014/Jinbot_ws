@@ -39,7 +39,7 @@
         <pose>0 0 0 0 -0 0</pose>
         <geometry>
           <mesh>
-            <uri>/home/entity014/mec_bot_description/worlds/map.dae</uri>
+            <uri>/home/entity014/Jinbot_ws/description/mec_bot_description/worlds/map.dae</uri>
             <scale>1 1 1</scale>
           </mesh>
         </geometry>

@@ -1,7 +1,7 @@
 #include <micro_ros_platformio.h>
 #include <Arduino.h>
 #include <stdio.h>
-#include <ESP32_Servo.h>
+#include <ESP32Servo.h>
 #include <AccelStepper.h>
 #include <MultiStepper.h>
 
@@ -44,11 +44,17 @@
 static uint32_t preT = 0;
 bool preTS = false;
 
-long positions[3];
+bool isSetZero1 = false;
+bool isSetZero2 = false;
+bool isSetZero3 = false;
+int flag_xy_state = 0;
+long positions[3] = {(long)1e6, (long)-1e6, (long)-1e6};
 long pre_positions[3];
 
-Servo servo1;
-Servo servo2;
+int theta[2];
+int pre_theta[2];
+
+Servo servos[2];
 
 AccelStepper stepM1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
 AccelStepper stepM2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
@@ -154,31 +160,57 @@ void task_arduino_fcn(void *arg)
     multiStep.addStepper(stepM2);
     multiStep.addStepper(stepM3);
 
-    servo1.attach(SERVO1);
-    servo2.attach(SERVO2);
-    servo1.write(0);
-    servo2.write(90);
-    positions[0] = 1e6;
-    positions[1] = 1e6;
-    positions[2] = 1e6;
-    multiStep.moveTo(positions);
+    ESP32PWM::allocateTimer(0);
+    ESP32PWM::allocateTimer(1);
+    ESP32PWM::allocateTimer(2);
+    ESP32PWM::allocateTimer(3);
+    servos[0].setPeriodHertz(50);
+    servos[1].setPeriodHertz(50);
+
+    servos[0].attach(SERVO1, 1000, 2000);
+    servos[1].attach(SERVO2, 1000, 2000);
+    servos[0].write(0);
+    servos[1].write(90);
     while (true)
     {
-        if (lim_switch(LIMIT1))
+        if (pre_theta[0] != theta[0])
+        {
+            servos[0].write(theta[0]);
+            pre_theta[0] = theta[0];
+        }
+        if (pre_theta[1] != theta[1])
+        {
+            servos[1].write(theta[1]);
+            pre_theta[1] = theta[1];
+        }
+
+        if (lim_switch(LIMIT2) == HIGH && !isSetZero1)
         {
             stepM1.setSpeed(0);
             stepM1.setCurrentPosition(0);
+            positions[0] = 0;
+            isSetZero1 = true;
         }
-        if (lim_switch(LIMIT2))
+        if (lim_switch(LIMIT1) == HIGH && !isSetZero2)
         {
             stepM2.setSpeed(0);
             stepM2.setCurrentPosition(0);
+            positions[1] = 0;
+            isSetZero2 = true;
         }
-        if (lim_switch(LIMIT3))
+        if (lim_switch(LIMIT3) == HIGH)
         {
             stepM3.setSpeed(0);
             stepM3.setCurrentPosition(0);
+            positions[2] = 0;
         }
+        if (isSetZero1 && isSetZero2)
+        {
+            positions[0] = -45000;
+            positions[1] = 35000;
+            flag_xy_state = 1;
+        }
+
         if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
         {
             pre_positions[0] = positions[0];
@@ -187,6 +219,24 @@ void task_arduino_fcn(void *arg)
             multiStep.moveTo(positions);
         }
         multiStep.run();
+
+        if (flag_xy_state == 1)
+        {
+            if (stepM1.distanceToGo() == 0)
+            {
+                stepM1.setCurrentPosition(0);
+                isSetZero1 = false;
+            }
+            if (stepM2.distanceToGo() == 0)
+            {
+                stepM2.setCurrentPosition(0);
+                isSetZero2 = false;
+            }
+            if (!isSetZero1 && !isSetZero2)
+            {
+                flag_xy_state = 0;
+            }
+        }
     }
 }
 
@@ -310,8 +360,8 @@ void destroy_entities()
 
 void renew()
 {
-    servo1.write(0);
-    servo2.write(90);
+    servos[0].write(0);
+    // servos[1].write(90);
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -321,12 +371,12 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     (void)last_call_time;
     if (timer != NULL)
     {
-        debug_msg.linear.x = stepM1.currentPosition();
-        debug_msg.linear.y = stepM2.currentPosition();
-        debug_msg.linear.z = stepM3.currentPosition();
-        debug_msg.angular.x = stepM1.speed();
-        debug_msg.angular.y = stepM2.speed();
-        debug_msg.angular.z = stepM3.speed();
+        debug_msg.linear.x = stepM1.speed();
+        debug_msg.linear.y = stepM2.speed();
+        debug_msg.linear.z = stepM3.speed();
+        debug_msg.angular.x = stepM1.distanceToGo();
+        debug_msg.angular.y = stepM2.distanceToGo();
+        debug_msg.angular.z = stepM3.distanceToGo();
         rcl_publish(&pub_debug, &debug_msg, NULL);
     }
 }
@@ -339,17 +389,15 @@ void sub_position_callback(const void *msgin)
     angular = flagGripper.getAngular(position_msg->x, position_msg->y);
     if ((position_msg->x != 0) || (position_msg->y != 0))
     {
-        positions[0] = ((float)177000 / 90) * angular.angular_a;
+        positions[0] = ((float)-177000 / 90) * angular.angular_a;
         positions[1] = ((float)177000 / 90) * angular.angular_b;
-        // positions[2] = position_msg->z;
+        positions[2] = ((float)177000 / 0.45) * position_msg->z;
     }
-    // positions[0] = position_msg->x;
-    // positions[1] = position_msg->y;
 }
 
 void sub_hand_callback(const void *msgin)
 {
     const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
-    servo1.write(hand_msg->x);
-    servo2.write(hand_msg->y);
+    theta[0] = hand_msg->x;
+    theta[1] = hand_msg->y;
 }

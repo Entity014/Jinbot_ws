@@ -17,8 +17,8 @@
 #define LENGTH_F 0.127
 
 // servo pin
-#define SERVO1 0
-#define SERVO2 2
+#define SERVO1 2
+#define SERVO2 16
 
 // step motor pin
 #define STEP1_PWM 5
@@ -31,8 +31,8 @@
 #define STEP3_DIR 14
 
 // limit switch pin
-#define LIMIT1 32
-#define LIMIT2 33
+#define LIMIT1 18
+#define LIMIT2 21
 #define LIMIT3 35
 
 #endif

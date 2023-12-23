@@ -38,5 +38,6 @@ Parallel_3dof::angular Parallel_3dof::getAngular(float position_x, float positio
 {
     // position_y -= length_f_ * sin(90 * DEG_TO_RAD);
     position_y += 0.012;
+    position_x += 0.04;
     return inverseKinematics(position_x, position_y);
 }

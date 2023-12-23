@@ -107,7 +107,7 @@
           <pose>0 0 0 0 -0 0</pose>
           <geometry>
             <mesh>
-              <uri>/home/entity014/mec_bot_description/worlds/map3d.dae</uri>
+              <uri>/home/entity014/Jinbot_ws/description/mec_bot_description/worlds/map3d.dae</uri>
               <scale>1 1 1</scale>
             </mesh>
           </geometry>
@@ -128,7 +128,7 @@
           <pose>0 0 0 0 -0 0</pose>
           <geometry>
             <mesh>
-              <uri>/home/entity014/mec_bot_description/worlds/map3d.dae</uri>
+              <uri>/home/entity014/Jinbot_ws/description/mec_bot_description/worlds/map3d.dae</uri>
               <scale>1 1 1</scale>
             </mesh>
           </geometry>
