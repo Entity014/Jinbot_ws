@@ -1,9 +1,7 @@
-from typing import Any
 import torch
 import numpy as np
 import cv2
 import os
-from pathlib import Path
 from ultralytics import YOLO
 
 from supervision import Detections, BoxAnnotator
@@ -20,9 +18,11 @@ class ObjectDetection:
             os.path.expanduser("~"), "Jinbot_ws/Program Test/weights/"
         )
 
-        self.model = self.load_model("best.pt")
+        self.model = self.load_model("model1_FN.pt")
         self.CLASS_NAMES_DICT = self.model.model.names
         self.box_annotator = BoxAnnotator(thickness=3, text_thickness=1, text_scale=0.5)
+        self.is_found = False
+        self.result_model = []
 
     def load_model(self, file):
         model = YOLO(f"{self.path}/{file}")
@@ -52,7 +52,6 @@ class ObjectDetection:
                 frame = self.box_annotator.annotate(
                     scene=frame, detections=detections, labels=self.labels
                 )
-
                 for xyxys in detections.xyxy:
                     cv2.circle(
                         frame,
@@ -64,6 +63,9 @@ class ObjectDetection:
                         (255, 0, 0),
                         -1,
                     )
+                if detections.confidence[0] > 0.6:
+                    self.is_found = True
+                    self.result_model = detections
 
         return frame
 
@@ -73,9 +75,25 @@ class ObjectDetection:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
         while cap.isOpened():
-            ref, frame = cap.read()
-            results = self.predict(frame)
-            frame = self.plot_bboxes(results, frame)
+            if not self.is_found:
+                ref, frame = cap.read()
+                frame = cv2.flip(frame, 0)
+                frame = cv2.flip(frame, 1)
+                results = self.predict(frame)
+                frame = self.plot_bboxes(results, frame)
+                cv2.circle(
+                    frame,
+                    (
+                        round(640 / 2),
+                        round(480 / 2),
+                    ),
+                    5,
+                    (255, 0, 0),
+                    -1,
+                )
+            if len(self.result_model) != 0:
+                print((self.result_model.xyxy[0][0] - 320) * 1e-3)
+
             cv2.imshow("frame", frame)
 
             if not ref:
@@ -88,5 +106,5 @@ class ObjectDetection:
         cv2.destroyAllWindows()
 
 
-detector = ObjectDetection(capture_index=2)
+detector = ObjectDetection(capture_index="/dev/video2")
 detector()

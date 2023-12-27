@@ -41,7 +41,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 name="sim",
-                default_value="false",
+                default_value="true",
                 description="Enable use_sime_time to true",
             ),
             DeclareLaunchArgument(

@@ -11,12 +11,16 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     ld = LaunchDescription()
 
-    node_config_path = PathJoinSubstitution(
+    config_path = PathJoinSubstitution(
         [FindPackageShare("jinbot_core"), "config", "params.yaml"]
     )
 
     lidar_config_path = PathJoinSubstitution(
         [FindPackageShare("jinbot_core"), "config", "lidar.yaml"]
+    )
+
+    lidar_filter_config_path = PathJoinSubstitution(
+        [FindPackageShare("jinbot_core"), "config", "lidar_filter.yaml"]
     )
 
     lidar_launch_path = PathJoinSubstitution(
@@ -53,23 +57,30 @@ def generate_launch_description():
         output="screen",
         arguments=["serial", "--dev", "/dev/ttyUSB4"],
     )
+    node_drive = Node(
+        package="jinbot_core", executable="drive_node", parameters=[config_path]
+    )
+    node_flag = Node(
+        package="jinbot_core", executable="flag_node", parameters=[config_path]
+    )
+    node_state = Node(
+        package="jinbot_core", executable="state_node", parameters=[config_path]
+    )
+    node_model_flag = Node(package="jinbot_core", executable="model_flag_node")
+    node_joy = Node(package="joy", executable="joy_node")
+    node_joyd = Node(package="jinbot_core", executable="joy_node")
+
     launch_lidar = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(lidar_launch_path),
         launch_arguments={
             "params_file": lidar_config_path,
         }.items(),
     )
-    node_drive = Node(
-        package="jinbot_core", executable="drive_node", parameters=[node_config_path]
+    node_lidar_filter = Node(
+        package="laser_filters",
+        executable="scan_to_scan_filter_chain",
+        parameters=[lidar_filter_config_path],
     )
-    node_flag = Node(
-        package="jinbot_core", executable="flag_node", parameters=[node_config_path]
-    )
-    node_state = Node(
-        package="jinbot_core", executable="state_node", parameters=[node_config_path]
-    )
-    node_joy = Node(package="joy", executable="joy_node")
-    node_joyd = Node(package="jinbot_core", executable="joy_node")
 
     ld.add_action(node_microros1)
     # ld.add_action(node_microros2)
@@ -81,6 +92,8 @@ def generate_launch_description():
     ld.add_action(node_drive)
     ld.add_action(node_flag)
     ld.add_action(node_state)
+    ld.add_action(node_model_flag)
     # ld.add_action(launch_lidar)
+    ld.add_action(node_lidar_filter)
 
     return ld

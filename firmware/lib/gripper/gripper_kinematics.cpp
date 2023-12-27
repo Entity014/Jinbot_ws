@@ -16,6 +16,11 @@ float Parallel_3dof::inverseFormular(float point_a, float point_b, float point_c
     return (2 * atan(u)) * RAD_TO_DEG;
 }
 
+float Parallel_3dof::toRangeDegree(float degree)
+{
+    return degree > 180 ? -(360 - degree) : degree;
+}
+
 Parallel_3dof::angular Parallel_3dof::inverseKinematics(float position_x, float position_y)
 {
     // Angular 1
@@ -29,14 +34,14 @@ Parallel_3dof::angular Parallel_3dof::inverseKinematics(float position_x, float 
     float point2_c = pow(position_x - length_e_, 2) + pow(position_y, 2) + pow(length_d_, 2) - pow(length_c_, 2);
 
     Parallel_3dof::angular angular;
-    angular.angular_a = 180 - inverseFormular(point1_a, point1_b, point1_c);
+    angular.angular_a = toRangeDegree(180 - inverseFormular(point1_a, point1_b, point1_c));
     angular.angular_b = inverseFormular(point2_a, point2_b, point2_c, true);
+    angular.angular_c = constrain(72 + (0.95 * asin((position_y - (length_a_ * sin(angular.angular_a * DEG_TO_RAD))) / length_b_) * RAD_TO_DEG), 0, 180);
     return angular;
 }
 
 Parallel_3dof::angular Parallel_3dof::getAngular(float position_x, float position_y)
 {
-    // position_y -= length_f_ * sin(90 * DEG_TO_RAD);
     position_y += 0.012;
     position_x += 0.04;
     return inverseKinematics(position_x, position_y);

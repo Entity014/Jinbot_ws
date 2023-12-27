@@ -16,6 +16,7 @@ setup(
         (os.path.join("share", package_name, "config"), glob("config/*.yaml")),
         (os.path.join("share", package_name, "rviz"), glob("rviz/*.yaml")),
         (os.path.join("share", package_name, "maps"), glob("maps/*")),
+        (os.path.join("share", package_name, "weights"), glob("weights/*")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
@@ -30,6 +31,7 @@ setup(
             "flag_node = jinbot_core.bot_flaggripper:main",
             "joy_node = jinbot_core.joy_drive:main",
             "state_node = jinbot_core.bot_state:main",
+            "model_flag_node = jinbot_core.bot_flag_model:main",
         ],
     },
 )

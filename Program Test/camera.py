@@ -2,12 +2,12 @@ import cv2
 import numpy as np
 
 
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture("/dev/video2")
 
 while cap.isOpened():
     ref, frame = cap.read()
     frame = cv2.flip(frame, 0)
-    frame = cv2.resize(frame, (720, 680))
+    # frame = cv2.resize(frame, (720, 680))
 
     cv2.imshow("webcam", frame)
     if not ref:

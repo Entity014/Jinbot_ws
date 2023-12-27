@@ -45,7 +45,7 @@ def generate_launch_description():
         [
             DeclareLaunchArgument(
                 name="sim",
-                default_value="false",
+                default_value="true",
                 description="Enable use_sime_time to true",
             ),
             DeclareLaunchArgument(
@@ -73,5 +73,9 @@ def generate_launch_description():
                 condition=IfCondition(LaunchConfiguration("rviz")),
                 parameters=[{"use_sim_time": LaunchConfiguration("sim")}],
             ),
+            # Node(
+            #     package="mec_bot_description",
+            #     executable="example_waypoint_follower",
+            # ),
         ]
     )

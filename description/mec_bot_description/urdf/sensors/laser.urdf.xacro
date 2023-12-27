@@ -55,8 +55,8 @@
                 <horizontal>
                 <samples>${ray_count}</samples>
                 <resolution>1</resolution>
-                <min_angle>${min_angle}</min_angle>
-                <max_angle>${max_angle}</max_angle>
+                <min_angle>${min_angle * (5/12)}</min_angle>
+                <max_angle>${max_angle * (5/12)}</max_angle>
                 </horizontal>
             </scan>
             <range>

@@ -44,10 +44,8 @@
 static uint32_t preT = 0;
 bool preTS = false;
 
-bool isSetZero1 = false;
-bool isSetZero2 = false;
-bool isSetZero3 = false;
 int flag_xy_state = 0;
+bool isSetZero[3] = {false, false, false};
 long positions[3] = {(long)1e6, (long)-1e6, (long)-1e6};
 long pre_positions[3];
 
@@ -68,6 +66,7 @@ Parallel_3dof flagGripper(LENGTH_A, LENGTH_B, LENGTH_C, LENGTH_D, LENGTH_E, LENG
 
 int lim_switch(int lim_pin);
 void task_arduino_fcn(void *arg);
+void set_zero_step();
 
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
@@ -88,12 +87,14 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
+geometry_msgs__msg__Twist step_msg;
 geometry_msgs__msg__Twist debug_msg;
 geometry_msgs__msg__Vector3 hand_msg;
 geometry_msgs__msg__Point position_msg;
 
 // ? define publisher
 rcl_publisher_t pub_debug;
+rcl_publisher_t pub_step;
 
 // ? define subscriber
 rcl_subscription_t sub_position;
@@ -183,33 +184,7 @@ void task_arduino_fcn(void *arg)
             servos[1].write(theta[1]);
             pre_theta[1] = theta[1];
         }
-
-        if (lim_switch(LIMIT2) == HIGH && !isSetZero1)
-        {
-            stepM1.setSpeed(0);
-            stepM1.setCurrentPosition(0);
-            positions[0] = 0;
-            isSetZero1 = true;
-        }
-        if (lim_switch(LIMIT1) == HIGH && !isSetZero2)
-        {
-            stepM2.setSpeed(0);
-            stepM2.setCurrentPosition(0);
-            positions[1] = 0;
-            isSetZero2 = true;
-        }
-        if (lim_switch(LIMIT3) == HIGH)
-        {
-            stepM3.setSpeed(0);
-            stepM3.setCurrentPosition(0);
-            positions[2] = 0;
-        }
-        if (isSetZero1 && isSetZero2)
-        {
-            positions[0] = -45000;
-            positions[1] = 35000;
-            flag_xy_state = 1;
-        }
+        set_zero_step();
 
         if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
         {
@@ -225,18 +200,56 @@ void task_arduino_fcn(void *arg)
             if (stepM1.distanceToGo() == 0)
             {
                 stepM1.setCurrentPosition(0);
-                isSetZero1 = false;
+                positions[0] = 0;
+                isSetZero[0] = false;
             }
             if (stepM2.distanceToGo() == 0)
             {
                 stepM2.setCurrentPosition(0);
-                isSetZero2 = false;
+                positions[1] = 0;
+                isSetZero[1] = false;
             }
-            if (!isSetZero1 && !isSetZero2)
+            if (stepM3.distanceToGo() == 0)
+            {
+                isSetZero[2] = false;
+            }
+            if (!isSetZero[0] && !isSetZero[1] && !isSetZero[2])
             {
                 flag_xy_state = 0;
             }
         }
+    }
+}
+
+void set_zero_step()
+{
+    if (lim_switch(LIMIT2) == HIGH && !isSetZero[0])
+    {
+        stepM1.setSpeed(0);
+        stepM1.setCurrentPosition(0);
+        positions[0] = 0;
+        isSetZero[0] = true;
+    }
+    if (lim_switch(LIMIT1) == HIGH && !isSetZero[1])
+    {
+        stepM2.setSpeed(0);
+        stepM2.setCurrentPosition(0);
+        positions[1] = 0;
+        isSetZero[1] = true;
+    }
+    if (lim_switch(LIMIT3) == HIGH && !isSetZero[2])
+    {
+        stepM3.setSpeed(0);
+        stepM3.setCurrentPosition(0);
+        positions[2] = 0;
+        isSetZero[2] = true;
+    }
+    if (isSetZero[0] && isSetZero[1] && isSetZero[2])
+    {
+        positions[0] = -45000;
+        positions[1] = 35000;
+        positions[2] = 5000;
+        flag_xy_state = 1;
     }
 }
 
@@ -321,6 +334,11 @@ bool create_entities()
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
         "debug/flag"));
+    RCCHECK(rclc_publisher_init_best_effort(
+        &pub_step,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+        "step_motor/state"));
 
     // TODO: create subscriber
     RCCHECK(rclc_subscription_init_default(
@@ -350,6 +368,7 @@ void destroy_entities()
     (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
     rcl_publisher_fini(&pub_debug, &node);
+    rcl_publisher_fini(&pub_step, &node);
     rcl_subscription_fini(&sub_position, &node);
     rcl_subscription_fini(&sub_hand, &node);
     rcl_timer_fini(&timer);
@@ -361,7 +380,10 @@ void destroy_entities()
 void renew()
 {
     servos[0].write(0);
-    // servos[1].write(90);
+    servos[1].write(90);
+    positions[0] = 1e6;
+    positions[1] = -1e6;
+    positions[2] = -1e6;
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -371,13 +393,18 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     (void)last_call_time;
     if (timer != NULL)
     {
-        debug_msg.linear.x = stepM1.speed();
-        debug_msg.linear.y = stepM2.speed();
-        debug_msg.linear.z = stepM3.speed();
-        debug_msg.angular.x = stepM1.distanceToGo();
-        debug_msg.angular.y = stepM2.distanceToGo();
-        debug_msg.angular.z = stepM3.distanceToGo();
+        debug_msg.linear.x = lim_switch(LIMIT1);
+        debug_msg.linear.y = lim_switch(LIMIT2);
+        debug_msg.linear.z = lim_switch(LIMIT3);
+
+        step_msg.linear.x = stepM1.currentPosition();
+        step_msg.linear.y = stepM2.currentPosition();
+        step_msg.linear.z = stepM3.currentPosition();
+        step_msg.angular.x = stepM1.distanceToGo();
+        step_msg.angular.y = stepM2.distanceToGo();
+        step_msg.angular.z = stepM3.distanceToGo();
         rcl_publish(&pub_debug, &debug_msg, NULL);
+        rcl_publish(&pub_step, &step_msg, NULL);
     }
 }
 
@@ -389,15 +416,21 @@ void sub_position_callback(const void *msgin)
     angular = flagGripper.getAngular(position_msg->x, position_msg->y);
     if ((position_msg->x != 0) || (position_msg->y != 0))
     {
-        positions[0] = ((float)-177000 / 90) * angular.angular_a;
-        positions[1] = ((float)177000 / 90) * angular.angular_b;
-        positions[2] = ((float)177000 / 0.45) * position_msg->z;
+        positions[0] = ((float)-177000 / 90) * constrain(angular.angular_a, -5, 120);
+        positions[1] = ((float)177000 / 90) * constrain(angular.angular_b, -5, 120);
     }
+    if (position_msg->z != 0)
+    {
+        positions[2] = ((float)179000 / 0.46) * constrain(position_msg->z, 0, 0.46);
+    }
+    debug_msg.angular.x = angular.angular_a;
+    debug_msg.angular.y = angular.angular_b;
+    debug_msg.angular.z = stepM3.distanceToGo();
 }
 
 void sub_hand_callback(const void *msgin)
 {
     const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
     theta[0] = hand_msg->x;
-    theta[1] = hand_msg->y;
+    // theta[1] = hand_msg->y;
 }

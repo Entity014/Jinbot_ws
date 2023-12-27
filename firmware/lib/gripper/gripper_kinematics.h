@@ -8,6 +8,7 @@ public:
     {
         float angular_a;
         float angular_b;
+        int angular_c;
     };
 
     Parallel_3dof(float length_a, float length_b, float length_c, float length_d, float length_e, float length_f);
@@ -16,6 +17,7 @@ public:
 private:
     angular inverseKinematics(float position_x, float position_y);
     float inverseFormular(float point_a, float point_b, float point_c, bool invert);
+    float toRangeDegree(float degree);
     float length_a_;
     float length_b_;
     float length_c_;
