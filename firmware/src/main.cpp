@@ -248,7 +248,7 @@ void set_zero_step()
   {
     positions[0] = -45000;
     positions[1] = 35000;
-    positions[2] = 5000;
+    positions[2] = ((float)179000 / 0.46) * 0.4;
     flag_xy_state = 1;
   }
 }
@@ -338,7 +338,7 @@ bool create_entities()
       &pub_step,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-      "step_motor/state"));
+      "gripper/flag/state"));
 
   // TODO: create subscriber
   RCCHECK(rclc_subscription_init_default(

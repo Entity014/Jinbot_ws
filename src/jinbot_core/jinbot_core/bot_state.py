@@ -2,8 +2,11 @@ import rclpy
 import numpy as np
 
 from rclpy.node import Node
-from std_msgs.msg import String, Int8
 from rclpy import qos, Parameter
+from rclpy.duration import Duration
+from std_msgs.msg import String, Int8, Bool
+from geometry_msgs.msg import PoseStamped
+from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
 
 class BotState(Node):
@@ -44,6 +47,13 @@ class BotState(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_retry_button
+        self.sub_flag_hold = self.create_subscription(
+            Bool,
+            "gripper/flag/hold",
+            self.sub_flag_hold_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_flag_hold
 
         self.declare_parameters(
             "",
@@ -67,19 +77,35 @@ class BotState(Node):
         self.pre_team_button = 0
         self.pre_retry_button = 0
 
+        self.flag_hold = False
+
     def timer_callback(self):
         msg_state_main_ros = Int8()
         msg_state_main = String()
         msg_state_team = String()
         msg_state_retry = String()
-        self.state_main_ros = (
-            self.get_parameter("main_ros").get_parameter_value().integer_value
-        )
+        # self.state_main_ros = (
+        #     self.get_parameter("main_ros").get_parameter_value().integer_value
+        # )
         self.state_retry = (
             self.get_parameter("retry").get_parameter_value().string_value
         )
         self.state_main = self.get_parameter("main").get_parameter_value().string_value
         self.state_team = self.get_parameter("team").get_parameter_value().string_value
+
+        if self.state_main == "Start":
+            if self.state_main_ros == 1:
+                self.state_main_ros = 2
+            elif self.state_main_ros == 2:
+                self.state_main_ros = 3
+            elif self.state_main_ros == 3:
+                self.state_main_ros = 4
+            elif self.state_main_ros == 4 and self.flag_hold:
+                self.state_main_ros = 5
+            elif self.state_main_ros == 5:
+                self.state_main_ros = 6
+        elif self.state_main == "Reset":
+            self.state_main_ros = 1
 
         msg_state_main_ros.data = self.state_main_ros
         msg_state_main.data = self.state_main
@@ -133,6 +159,9 @@ class BotState(Node):
             self.state_retry = "Red"
         else:
             self.retry_order = 0
+
+    def sub_flag_hold_callback(self, msg_in):
+        self.flag_hold = msg_in.data
 
 
 def main():

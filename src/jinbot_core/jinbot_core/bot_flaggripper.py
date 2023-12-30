@@ -16,6 +16,16 @@ class BotFlag(Node):
         self.sent_flag_theta = self.create_publisher(
             Vector3, "gripper/flag/hand", qos_profile=qos.qos_profile_system_default
         )
+        self.sent_flag_hold = self.create_publisher(
+            Bool, "gripper/flag/hold", qos_profile=qos.qos_profile_system_default
+        )
+        self.sub_step_motor = self.create_subscription(
+            Twist,
+            "gripper/flag/state",
+            self.sub_step_motor_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_step_motor
         self.sub_state = self.create_subscription(
             Int8,
             "state/main_ros",
@@ -23,13 +33,6 @@ class BotFlag(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_state
-        self.sub_step_motor = self.create_subscription(
-            Twist,
-            "step_motor/state",
-            self.sub_step_motor_callback,
-            qos_profile=qos.qos_profile_sensor_data,
-        )
-        self.sub_step_motor
         self.sub_flag_tuning = self.create_subscription(
             Float32,
             "gripper/flag/tune",
@@ -73,12 +76,21 @@ class BotFlag(Node):
         self.distance_step_motor2 = 0.0
         self.distance_step_motor3 = 0.0
 
+        self.ready_step_motor1 = False
+        self.ready_step_motor2 = False
+        self.ready_step_motor3 = False
+        # self.start_step_motor1 = False
+        # self.start_step_motor2 = False
+        # self.start_step_motor3 = False
+
         self.tuning = 0.0
         self.detect = False
+        self.hold = False
 
     def timer_callback(self):
         msg_pos = Point()
         msg_theta = Vector3()
+        msg_hold = Bool()
         # self.position_x = (
         #     self.get_parameter("position.x").get_parameter_value().double_value
         # )
@@ -88,9 +100,9 @@ class BotFlag(Node):
         # self.position_z = (
         #     self.get_parameter("position.z").get_parameter_value().double_value
         # )
-        self.theta1 = self.get_parameter("theta.x").get_parameter_value().double_value
-        self.theta2 = self.get_parameter("theta.y").get_parameter_value().double_value
-        self.theta3 = self.get_parameter("theta.z").get_parameter_value().double_value
+        # self.theta1 = self.get_parameter("theta.x").get_parameter_value().double_value
+        # self.theta2 = self.get_parameter("theta.y").get_parameter_value().double_value
+        # self.theta3 = self.get_parameter("theta.z").get_parameter_value().double_value
 
         msg_pos.x = self.position_x
         msg_pos.y = self.position_y
@@ -100,43 +112,48 @@ class BotFlag(Node):
         msg_theta.y = self.theta2
         msg_theta.z = self.theta3
 
+        msg_hold.data = self.hold
+
         self.sent_flag_pos.publish(msg_pos)
         self.sent_flag_theta.publish(msg_theta)
+        self.sent_flag_hold.publish(msg_hold)
 
     def sub_state_callback(self, msg_in):
         self.mainros_state = msg_in.data
-        self.get_logger().info(f"{self.node_state}")
-        if self.mainros_state == 4 and self.node_state == 0:
-            self.node_state = 1
+        self.get_logger().info(
+            f"{self.node_state} {self.ready_step_motor1} {self.ready_step_motor2} {self.ready_step_motor3}"
+        )
 
-        if self.node_state == 1 and self.current_step_motor3 == 5000.0:
-            self.position_z = 0.4
-            self.node_state = 2
-        elif (
-            self.node_state == 2
-            and self.current_step_motor1 == 0.0
-            and self.current_step_motor2 == 0.0
-            and self.distance_step_motor3 == 1.0
-            and self.detect
-        ):
-            self.position_x = 0.1 * self.tuning
-            self.position_y = 0.43
-            self.position_z = 0.08
-            self.node_state = 3
-        elif (
-            self.node_state == 3
-            and self.distance_step_motor1 == 1.0
-            and self.distance_step_motor2 == 1.0
-            and self.distance_step_motor3 == 1.0
-        ):
-            self.theta1 = 160.0
-            self.position_z = 0.40
-            self.node_state = 4
-        elif self.node_state == 4 and self.distance_step_motor3 == 1.0:
-            self.position_x = 0.01
-            self.position_y = 0.11
-            self.position_z = 0.05
-            self.node_state = 5
+        if self.mainros_state == 4:
+            if self.node_state == 0:
+                self.node_state = 1
+
+            elif self.node_state == 1 and self.ready_step_motor3 and self.detect:
+                self.position_x = self.tuning
+                self.position_y = 0.43
+                self.position_z = 0.05
+                self.node_state = 2
+            elif (
+                self.node_state == 2
+                and self.ready_step_motor1
+                and self.ready_step_motor2
+                and self.ready_step_motor3
+            ):
+                self.theta1 = 170.0
+                self.position_z = 0.40
+                self.node_state = 3
+            elif self.node_state == 3 and self.ready_step_motor3:
+                self.position_x = 0.01
+                self.position_y = 0.11
+                self.position_z = 0.05
+                self.node_state = 4
+            elif (
+                self.node_state == 4
+                and self.ready_step_motor1
+                and self.ready_step_motor2
+                and self.ready_step_motor3
+            ):
+                self.hold = True
 
     def sub_step_motor_callback(self, msg_in):
         self.current_step_motor1 = msg_in.linear.x
@@ -145,12 +162,48 @@ class BotFlag(Node):
         self.distance_step_motor1 = msg_in.angular.x
         self.distance_step_motor2 = msg_in.angular.y
         self.distance_step_motor3 = msg_in.angular.z
+        # self.start_step_motor1 = True if self.distance_step_motor1 > 0.0 else False
+        # self.start_step_motor2 = True if self.distance_step_motor1 > 0.0 else False
+        # self.start_step_motor3 = True if self.distance_step_motor1 > 0.0 else False
+        # self.ready_step_motor1 = (
+        #     True
+        #     if self.distance_step_motor1 == 0.0 and self.start_step_motor1
+        #     else False
+        # )
+        # self.ready_step_motor2 = (
+        #     True
+        #     if self.distance_step_motor2 == 0.0 and self.start_step_motor2
+        #     else False
+        # )
+        # self.ready_step_motor3 = (
+        #     True
+        #     if self.distance_step_motor3 == 0.0 and self.start_step_motor3
+        #     else False
+        # )
+
+        self.ready_step_motor1 = ready_step(self.distance_step_motor1)
+        self.ready_step_motor2 = ready_step(self.distance_step_motor2)
+        self.ready_step_motor3 = ready_step(self.distance_step_motor3)
 
     def sub_flag_tuning_callback(self, msg_in):
         self.tuning = msg_in.data
 
     def sub_flag_detect_callback(self, msg_in):
         self.detect = msg_in.data
+
+
+def ready_step(distance):
+    isStart = False
+    isStop = False
+    if distance > 0 and not isStop:
+        isStart = True
+    if distance == 0 and isStart:
+        isStart = False
+        isStop = True
+    else:
+        isStop = False
+
+    return isStop
 
 
 def main():

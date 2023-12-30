@@ -83,7 +83,7 @@ def generate_launch_description():
     )
 
     ld.add_action(node_microros1)
-    # ld.add_action(node_microros2)
+    ld.add_action(node_microros2)
     # ld.add_action(node_microros3)
     # ld.add_action(node_microros4)
     # ld.add_action(node_microros5)

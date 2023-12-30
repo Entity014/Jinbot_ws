@@ -32,7 +32,7 @@ class BotFlagModel(Node):
         self.sub_state
         self.sub_step_motor = self.create_subscription(
             Twist,
-            "step_motor/state",
+            "gripper/flag/state",
             self.sub_step_motor_callback,
             qos_profile=qos.qos_profile_sensor_data,
         )
@@ -137,7 +137,10 @@ class BotFlagModel(Node):
                     -1,
                 )
             if len(self.result_model) != 0:
-                self.tuning = (self.result_model.xyxy[0][0] - 320) * 1e-3
+                # self.tuning = (self.result_model.xyxy[0][0] - 320) * 1e-3
+                self.tuning = np.interp(
+                    self.result_model.xyxy[0][0] - 320, [0, 640], [-0.3, 0.3]
+                )
                 msg_tuning.data = self.tuning
                 msg_detect.data = self.is_found
                 self.sent_tune_gripper.publish(msg_tuning)
