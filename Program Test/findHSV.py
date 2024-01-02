@@ -102,4 +102,4 @@ if __name__ == "__main__":
     # ? S to save hsv.npy
     # ? Mode is [ CAM, IMG, VIDEO ]
     # ? CAM mode source only int
-    find_HSV(source=2, mode="cam")
+    find_HSV(source="/dev/video2", mode="cam")

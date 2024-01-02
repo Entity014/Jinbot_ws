@@ -15,7 +15,6 @@
 #include <rclc/executor.h>
 
 #include <std_msgs/msg/int8.h>
-#include <std_msgs/msg/string.h>
 #include <sensor_msgs/msg/imu.h>
 #include <nav_msgs/msg/odometry.h>
 #include <geometry_msgs/msg/twist.h>
@@ -78,13 +77,11 @@ Odometry odometry;
 IMU imu;
 
 //------------------------------ < Fuction Prototype > ------------------------------//
-void task_arduino_fcn(void *arg);
 void moveBase();
 void syncTime();
 void publishData();
 struct timespec getTime();
 int lim_switch(int lim_pin);
-String get_color(int value);
 
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
@@ -107,7 +104,6 @@ rclc_executor_t executor;
 std_msgs__msg__Int8 start_msg;
 std_msgs__msg__Int8 team_msg;
 std_msgs__msg__Int8 retry_msg;
-std_msgs__msg__String color_msg;
 sensor_msgs__msg__Imu imu_msg;
 nav_msgs__msg__Odometry odom_msg;
 geometry_msgs__msg__Twist pwm_msg;
@@ -122,7 +118,6 @@ rcl_publisher_t pub_pwm;
 rcl_publisher_t pub_start;
 rcl_publisher_t pub_team;
 rcl_publisher_t pub_retry;
-rcl_publisher_t pub_color;
 
 // ? define subscriber
 rcl_subscription_t sub_velocity;
@@ -143,54 +138,60 @@ enum states
 
 void setup()
 {
-    xTaskCreate(
-        task_arduino_fcn, /* Task function. */
-        "Arduino Task",   /* String with name of task. */
-        1024,             /* Stack size in bytes. */
-        NULL,             /* Parameter passed as input of the task */
-        0,                /* Priority of the task. */
-        NULL);            /* Task handle. */
-
-    xTaskCreate(
-        task_ros_fcn, /* Task function. */
-        "Ros Task",   /* String with name of task. */
-        4096,         /* Stack size in bytes. */
-        NULL,         /* Parameter passed as input of the task */
-        1,            /* Priority of the task. */
-        NULL);        /* Task handle. */
-}
-
-void loop()
-{
-}
-
-//------------------------------ < Fuction > ----------------------------------------//
-void task_arduino_fcn(void *arg)
-{
+    Serial.begin(115200);
+    set_microros_serial_transports(Serial);
+    imu.init();
     motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
     motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
     motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
     pinMode(START_BUTTON, INPUT_PULLUP);
     pinMode(TEAM_BUTTON, INPUT_PULLUP);
     pinMode(RETRY_BUTTON, INPUT_PULLUP);
-    pinMode(COLOR, INPUT);
+}
 
-    imu.init();
-    while (true)
+void loop()
+{
+    switch (state)
     {
-        /* code */
+    case WAITING_AGENT:
+        EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+        break;
+    case AGENT_AVAILABLE:
+        state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+        if (state == WAITING_AGENT)
+        {
+            destroy_entities();
+        };
+        break;
+    case AGENT_CONNECTED:
+        EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
+        if (state == AGENT_CONNECTED)
+        {
+            rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+        }
+        break;
+    case AGENT_DISCONNECTED:
+        destroy_entities();
+        state = WAITING_AGENT;
+        break;
+    default:
+        break;
+    }
+
+    if (state == AGENT_CONNECTED)
+    {
+    }
+    else
+    {
+        renew();
     }
 }
+
+//------------------------------ < Fuction > ----------------------------------------//
 
 int lim_switch(int lim_pin)
 {
     return !digitalRead(lim_pin);
-}
-
-String get_color(int value)
-{
-    return (value < 1000) ? "Blue" : (value < 2000) ? "Green"
-                                                    : "Yellow";
 }
 
 void moveBase()
@@ -269,8 +270,6 @@ void publishData()
     start_msg.data = lim_switch(START_BUTTON);
     team_msg.data = lim_switch(TEAM_BUTTON);
     retry_msg.data = lim_switch(RETRY_BUTTON);
-    color_msg.data.data = (char *)get_color(analogRead(COLOR)).c_str();
-
     struct timespec time_stamp = getTime();
 
     odom_msg.header.stamp.sec = time_stamp.tv_sec;
@@ -289,50 +288,6 @@ void publishData()
 }
 
 //------------------------------ < Ros Fuction > ------------------------------------//
-
-void task_ros_fcn(void *arg)
-{
-    Serial.begin(115200);
-    set_microros_serial_transports(Serial);
-    while (true)
-    {
-        switch (state)
-        {
-        case WAITING_AGENT:
-            EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
-            break;
-        case AGENT_AVAILABLE:
-            state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-            if (state == WAITING_AGENT)
-            {
-                destroy_entities();
-            };
-            break;
-        case AGENT_CONNECTED:
-            EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-            if (state == AGENT_CONNECTED)
-            {
-                rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-            }
-            break;
-        case AGENT_DISCONNECTED:
-            destroy_entities();
-            state = WAITING_AGENT;
-            break;
-        default:
-            break;
-        }
-
-        if (state == AGENT_CONNECTED)
-        {
-            continue;
-        }
-        else
-        {
-            renew();
-        }
-    }
-}
 
 bool create_entities()
 {
@@ -391,11 +346,6 @@ bool create_entities()
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
         "button/retry"));
-    RCCHECK(rclc_publisher_init_default(
-        &pub_color,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
-        "color/floor"));
 
     // TODO: create subscriber
     RCCHECK(rclc_subscription_init_default(
@@ -424,7 +374,6 @@ void destroy_entities()
     rcl_publisher_fini(&pub_odom, &node);
     rcl_publisher_fini(&pub_start, &node);
     rcl_publisher_fini(&pub_retry, &node);
-    rcl_publisher_fini(&pub_color, &node);
     rcl_publisher_fini(&pub_debug, &node);
     rcl_subscription_fini(&sub_velocity, &node);
     rcl_timer_fini(&timer);

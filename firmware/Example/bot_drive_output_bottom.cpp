@@ -50,11 +50,8 @@ bool is_reset = false;
 
 //------------------------------ < Fuction Prototype > ------------------------------//
 
-void task_arduino_fcn(void *arg);
-
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
-void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
 void sub_pwm_callback(const void *msgin);
 void sub_main_callback(const void *msgin);
@@ -124,40 +121,6 @@ enum retry_states
 
 void setup()
 {
-    xTaskCreate(
-        task_arduino_fcn, /* Task function. */
-        "Arduino Task",   /* String with name of task. */
-        1024,             /* Stack size in bytes. */
-        NULL,             /* Parameter passed as input of the task */
-        0,                /* Priority of the task. */
-        NULL);            /* Task handle. */
-
-    xTaskCreate(
-        task_ros_fcn, /* Task function. */
-        "Ros Task",   /* String with name of task. */
-        4096,         /* Stack size in bytes. */
-        NULL,         /* Parameter passed as input of the task */
-        1,            /* Priority of the task. */
-        NULL);        /* Task handle. */
-}
-
-void loop()
-{
-}
-
-//------------------------------ < Fuction > ----------------------------------------//
-
-void task_arduino_fcn(void *arg)
-{
-    while (true)
-    {
-    }
-}
-
-//------------------------------ < Ros Fuction > ------------------------------------//
-
-void task_ros_fcn(void *arg)
-{
     Serial.begin(115200);
     set_microros_serial_transports(Serial);
 
@@ -172,48 +135,53 @@ void task_ros_fcn(void *arg)
 
     digitalWrite(LED1_PIN, LOW);
     digitalWrite(LED2_PIN, LOW);
-    while (true)
-    {
-        switch (state)
-        {
-        case WAITING_AGENT:
-            EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
-            break;
-        case AGENT_AVAILABLE:
-            state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-            if (state == WAITING_AGENT)
-            {
-                destroy_entities();
-            };
-            break;
-        case AGENT_CONNECTED:
-            EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-            if (state == AGENT_CONNECTED)
-            {
-                rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-            }
-            break;
-        case AGENT_DISCONNECTED:
-            destroy_entities();
-            state = WAITING_AGENT;
-            break;
-        default:
-            break;
-        }
+}
 
+void loop()
+{
+    switch (state)
+    {
+    case WAITING_AGENT:
+        EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+        break;
+    case AGENT_AVAILABLE:
+        state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+        if (state == WAITING_AGENT)
+        {
+            destroy_entities();
+        };
+        break;
+    case AGENT_CONNECTED:
+        EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
         if (state == AGENT_CONNECTED)
         {
-            digitalWrite(LED1_PIN, HIGH);
-            digitalWrite(LED2_PIN, LOW);
+            rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
         }
-        else
-        {
-            digitalWrite(LED1_PIN, LOW);
-            digitalWrite(LED2_PIN, HIGH);
-            renew();
-        }
+        break;
+    case AGENT_DISCONNECTED:
+        destroy_entities();
+        state = WAITING_AGENT;
+        break;
+    default:
+        break;
+    }
+
+    if (state == AGENT_CONNECTED)
+    {
+        digitalWrite(LED1_PIN, HIGH);
+        digitalWrite(LED2_PIN, LOW);
+    }
+    else
+    {
+        digitalWrite(LED1_PIN, LOW);
+        digitalWrite(LED2_PIN, HIGH);
+        renew();
     }
 }
+
+//------------------------------ < Fuction > ----------------------------------------//
+
+//------------------------------ < Ros Fuction > ------------------------------------//
 
 bool create_entities()
 {

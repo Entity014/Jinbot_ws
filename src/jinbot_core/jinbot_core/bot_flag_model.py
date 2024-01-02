@@ -7,9 +7,9 @@ import os
 from ultralytics import YOLO
 from supervision import Detections, BoxAnnotator
 from rclpy.node import Node
-from std_msgs.msg import Int8, Float32, Bool
+from std_msgs.msg import Int8, Float32
 from geometry_msgs.msg import Twist
-from rclpy import qos
+from rclpy import qos, Parameter
 from cv_bridge import CvBridge
 
 
@@ -18,9 +18,6 @@ class BotFlagModel(Node):
         super().__init__("flag_grip_model_node")
         self.sent_tune_gripper = self.create_publisher(
             Float32, "gripper/flag/tune", qos_profile=qos.qos_profile_system_default
-        )
-        self.sent_detect_gripper = self.create_publisher(
-            Bool, "gripper/flag/detect", qos_profile=qos.qos_profile_system_default
         )
         self.sent_timer = self.create_timer(0.05, self.timer_callback)
         self.sub_state = self.create_subscription(
@@ -37,28 +34,27 @@ class BotFlagModel(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_step_motor
-
-        self.cap = cv2.VideoCapture("/dev/video2")
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.path = os.path.join(
-            os.path.expanduser("~"),
-            "Jinbot_ws",
-            "install",
-            "jinbot_core",
-            "share",
-            "jinbot_core",
-            "weights",
+        self.declare_parameters(
+            "",
+            [
+                ("max_range", Parameter.Type.DOUBLE),
+                ("min_range", Parameter.Type.DOUBLE),
+            ],
         )
-        self.model = self.load_model("model1_FN.pt")
-        self.CLASS_NAMES_DICT = self.model.model.names
-        self.box_annotator = BoxAnnotator(thickness=3, text_thickness=1, text_scale=0.5)
-        self.is_found = False
-        self.result_model = []
-        self.tuning = 0.0
+        self.tuning = 90.0
+        self.diff_tuning = 1.0
         self.frame = np.zeros((480, 640, 3), dtype=np.uint8)
         self.mainros_state = 0
+
+        self.max_range = (
+            self.get_parameter("max_range").get_parameter_value().double_value
+        )
+        self.min_range = (
+            self.get_parameter("min_range").get_parameter_value().double_value
+        )
+
+        self.cX = 0
+        self.cY = 0
 
         self.current_step_motor1 = 0.0
         self.current_step_motor2 = 0.0
@@ -67,91 +63,26 @@ class BotFlagModel(Node):
         self.distance_step_motor2 = 0.0
         self.distance_step_motor3 = 0.0
 
-    def load_model(self, file):
-        model = YOLO(f"{self.path}/{file}")
-        model.fuse()
-        return model
-
-    def predict(self, frame):
-        results = self.model(frame)
-        return results
-
-    def plot_bboxes(self, results, frame):
-        for result in results[0]:
-            if result.boxes.conf.cpu().numpy() >= 0.4:
-                detections = Detections(
-                    xyxy=result.boxes.xyxy.cpu().numpy(),
-                    confidence=result.boxes.conf.cpu().numpy(),
-                    class_id=result.boxes.cls.cpu().numpy().astype(int),
-                )
-
-                self.labels = [
-                    f"{self.CLASS_NAMES_DICT[class_id]} {confidence:0.2f}"
-                    for confidence, class_id in zip(
-                        detections.confidence, detections.class_id
-                    )
-                ]
-
-                frame = self.box_annotator.annotate(
-                    scene=frame, detections=detections, labels=self.labels
-                )
-
-                for xyxys in detections.xyxy:
-                    cv2.circle(
-                        frame,
-                        (
-                            round((xyxys[2] + xyxys[0]) / 2),
-                            round((xyxys[3] + xyxys[1]) / 2),
-                        ),
-                        5,
-                        (255, 0, 0),
-                        -1,
-                    )
-
-                if detections.confidence[0] > 0.6:
-                    self.is_found = True
-                    self.result_model = detections
-
-        return frame
-
     def timer_callback(self):
         msg_tuning = Float32()
-        msg_detect = Bool()
-        if self.mainros_state == 4 and self.current_step_motor3 >= round(
-            (179000 / 0.46) * 0.4
-        ):
-            ref, frame = self.cap.read()
-            frame = cv2.flip(frame, 0)
-            frame = cv2.flip(frame, 1)
-            if not self.is_found:
-                results = self.predict(frame)
-                self.frame = self.plot_bboxes(results, frame)
-                cv2.circle(
-                    frame,
-                    (
-                        round(640 / 2),
-                        round(480 / 2),
-                    ),
-                    5,
-                    (255, 0, 0),
-                    -1,
-                )
-            if len(self.result_model) != 0:
-                # self.tuning = (self.result_model.xyxy[0][0] - 320) * 1e-3
-                self.tuning = np.interp(
-                    self.result_model.xyxy[0][0] - 320, [0, 640], [-0.3, 0.3]
-                )
+        if self.mainros_state == 4:
+            cap = cv2.VideoCapture("/dev/video2")
+            ref, self.frame = cap.read()
+            if ref:
+                self.frame = cv2.resize(self.frame, (760, 600))
+                self.frame = cv2.flip(self.frame, 0)
+                self.frame = cv2.flip(self.frame, 1)
+                hsv_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
+                dil_frame_mask = dilate_frame(hsv_frame, 50, 0, 69, 43)
+                self.search_contours(dil_frame_mask)
+                if self.cX > 380:
+                    self.tuning += self.diff_tuning
+                elif self.cX < 370:
+                    self.tuning -= self.diff_tuning
+                # self.tuning = np.interp(self.cX, [0, 760], [50, 130])
                 msg_tuning.data = self.tuning
-                msg_detect.data = self.is_found
                 self.sent_tune_gripper.publish(msg_tuning)
-                self.sent_detect_gripper.publish(msg_detect)
-                # cv2.destroyAllWindows()
-                # exit()
-            cv2.imshow("frame", self.frame)
-
-            if not ref:
-                cv2.destroyAllWindows()
-                exit()
+                # cv2.imshow("frame", self.frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 cv2.destroyAllWindows()
@@ -167,6 +98,48 @@ class BotFlagModel(Node):
         self.distance_step_motor1 = msg_in.angular.x
         self.distance_step_motor2 = msg_in.angular.y
         self.distance_step_motor3 = msg_in.angular.z
+
+    def search_contours(self, mask):
+        contours, hierarchy = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            x, y, w, h = cv2.boundingRect(contour)
+            epsilon = 0.01 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+            num_vertices = len(approx)
+            if area > 1000:
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    self.cX = int(M["m10"] / M["m00"])
+                    self.cY = int(M["m01"] / M["m00"])
+                else:
+                    self.cX, self.cY = 0, 0
+                cv2.drawContours(self.frame, [approx], -1, (0, 255, 0), 2)
+                cv2.circle(self.frame, (self.cX, self.cY), 7, (0, 0, 255), -1)
+                cv2.circle(self.frame, (380, 300), 7, (255, 0, 0), -1)
+
+
+def dilate_frame(frame, hue, diff=0, sl=0, vl=0):
+    lower_hsv = np.array([constrain(hue - diff, 0, 179), sl, vl])
+    upper_hsv = np.array([179, 255, 255])
+    mask = cv2.inRange(frame, lower_hsv, upper_hsv)
+    # res_frame = cv2.bitwise_or(frame, frame, mask=mask)
+    # gray_frame = cv2.cvtColor(res_frame, cv2.COLOR_BGR2GRAY)
+    # threshold = cv2.adaptiveThreshold(
+    #     mask, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2.5
+    # )
+    # canny_frame = cv2.Canny(gray_frame, 0, 255)
+    # kernel = np.ones((5, 5))
+    # cv2.imshow("color_search", canny_frame)
+    # return cv2.dilate(canny_frame, kernel, iterations=1)
+    return mask
+
+
+def constrain(value, min_val, max_val):
+    return min(max_val, max(min_val, value))
 
 
 def main():

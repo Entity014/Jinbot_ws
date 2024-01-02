@@ -42,7 +42,7 @@ public:
 
     bool startSensor() override
     {
-        Wire.begin();
+        Wire.begin(21, 22);
         bool ret;
         accelerometer_.initialize();
         ret = accelerometer_.testConnection();

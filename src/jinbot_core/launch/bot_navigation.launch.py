@@ -1,85 +1,139 @@
-# Copyright (c) 2021 Juan Miguel Jimeno
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http:#www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+from ament_index_python.packages import get_package_share_directory
+from launch.actions import IncludeLaunchDescription, RegisterEventHandler
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.conditions import IfCondition
-from launch_ros.substitutions import FindPackageShare
-from launch_ros.actions import Node
 
-MAP_NAME = "jinpao_blue2"  # change to the name of your own map here
+MAP_NAME = "jinpao_blue2"
 
 
 def generate_launch_description():
-    depth_sensor = os.getenv("MECBOT_DEPTH_SENSOR", "")
+    ld = LaunchDescription()
 
-    nav2_launch_path = PathJoinSubstitution(
-        [FindPackageShare("nav2_bringup"), "launch", "bringup_launch.py"]
+    config_path = PathJoinSubstitution(
+        [FindPackageShare("jinbot_core"), "config", "params.yaml"]
     )
-
+    ekf_config_path = PathJoinSubstitution(
+        [FindPackageShare("jinbot_core"), "config", "ekf.yaml"]
+    )
     rviz_config_path = PathJoinSubstitution(
-        [FindPackageShare("jinbot_core"), "rviz", "jinbot_navigation.rviz"]
+        [FindPackageShare("jinbot_core"), "rviz", "mec_bot_navigation.rviz"]
     )
-
     default_map_path = PathJoinSubstitution(
         [FindPackageShare("jinbot_core"), "maps", f"{MAP_NAME}.yaml"]
     )
-
     nav2_config_path = PathJoinSubstitution(
         [FindPackageShare("jinbot_core"), "config", "navigation.yaml"]
     )
 
-    return LaunchDescription(
-        [
-            DeclareLaunchArgument(
-                name="sim",
-                default_value="false",
-                description="Enable use_sime_time to true",
-            ),
-            DeclareLaunchArgument(
-                name="rviz", default_value="true", description="Run rviz"
-            ),
-            DeclareLaunchArgument(
-                name="map",
-                default_value=default_map_path,
-                description="Navigation map path",
-            ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(nav2_launch_path),
-                launch_arguments={
-                    "map": LaunchConfiguration("map"),
-                    "use_sim_time": LaunchConfiguration("sim"),
-                    "params_file": nav2_config_path,
-                }.items(),
-            ),
-            Node(
-                package="rviz2",
-                executable="rviz2",
-                name="rviz2",
-                output="screen",
-                arguments=["-d", rviz_config_path],
-                condition=IfCondition(LaunchConfiguration("rviz")),
-                parameters=[{"use_sim_time": LaunchConfiguration("sim")}],
-            ),
-            Node(
-                package="micro_ros_agent",
-                executable="micro_ros_agent",
-                output="screen",
-                arguments=["serial", "--dev", "/dev/ttyUSB0"],
-            ),
-        ]
+    lidar_launch_path = PathJoinSubstitution(
+        [FindPackageShare("sllidar_ros2"), "launch", "sllidar_a3_launch.py"]
     )
+    nav2_launch_path = PathJoinSubstitution(
+        [FindPackageShare("nav2_bringup"), "launch", "bringup_launch.py"]
+    )
+
+    launch_nav = (
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(nav2_launch_path),
+            launch_arguments={
+                "map": LaunchConfiguration("map"),
+                "use_sim_time": LaunchConfiguration("sim"),
+                "params_file": nav2_config_path,
+            }.items(),
+        ),
+    )
+    launch_lidar = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(lidar_launch_path),
+        launch_arguments={
+            "params_file": config_path,
+        }.items(),
+    )
+
+    node_microros1 = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+        output="screen",
+        arguments=["serial", "--dev", "/dev/esp32_1"],
+    )
+    node_microros2 = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+        output="screen",
+        arguments=["serial", "--dev", "/dev/esp32_2"],
+    )
+    node_microros3 = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+        output="screen",
+        arguments=["serial", "--dev", "/dev/esp32_3"],
+    )
+    node_microros4 = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+        output="screen",
+        arguments=["serial", "--dev", "/dev/esp32_4"],
+    )
+    node_microros5 = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+        output="screen",
+        arguments=["serial", "--dev", "/dev/esp32_5"],
+    )
+    node_drive = Node(
+        package="jinbot_core", executable="drive_node", parameters=[config_path]
+    )
+    node_flag = Node(
+        package="jinbot_core", executable="flag_node", parameters=[config_path]
+    )
+    node_state = Node(
+        package="jinbot_core", executable="state_node", parameters=[config_path]
+    )
+    node_model_flag = Node(
+        package="jinbot_core", executable="model_flag_node", parameters=[config_path]
+    )
+    node_joy = Node(package="joy", executable="joy_node")
+    node_joyd = Node(package="jinbot_core", executable="joy_node")
+
+    node_lidar_filter = Node(
+        package="laser_filters",
+        executable="scan_to_scan_filter_chain",
+        parameters=[config_path],
+    )
+    node_localization = Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="ekf_filter_node",
+        output="screen",
+        parameters=[ekf_config_path],
+        remappings=[("odometry/filtered", "odom")],
+    )
+    node_rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        arguments=["-d", rviz_config_path],
+    )
+
+    ld.add_action(node_microros1)
+    ld.add_action(node_microros2)
+    ld.add_action(node_microros3)
+    # ld.add_action(node_microros4)
+    # ld.add_action(node_microros5)
+    ld.add_action(node_joy)
+    ld.add_action(node_joyd)
+    ld.add_action(node_drive)
+    ld.add_action(node_flag)
+    ld.add_action(node_state)
+    ld.add_action(node_model_flag)
+    ld.add_action(launch_lidar)
+    ld.add_action(node_lidar_filter)
+    ld.add_action(node_localization)
+    ld.add_action(launch_nav)
+    ld.add_action(node_rviz)
+
+    return ld

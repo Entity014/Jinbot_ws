@@ -6,9 +6,9 @@
 
 #define USE_PARALLEL_3DOF // parallel gripper 3 degree of freedom
 
-#define STEP1_SPEED 20000
-#define STEP2_SPEED 20000
-#define STEP3_SPEED 22000
+#define STEP1_SPEED 40000
+#define STEP2_SPEED 40000
+#define STEP3_SPEED 41000
 #define LENGTH_A 0.293
 #define LENGTH_B 0.352
 #define LENGTH_C 0.352

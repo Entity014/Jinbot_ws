@@ -8,7 +8,7 @@ public:
     {
         float angular_a;
         float angular_b;
-        int angular_c;
+        // int angular_c;
     };
 
     Parallel_3dof(float length_a, float length_b, float length_c, float length_d, float length_e, float length_f);

@@ -91,23 +91,24 @@ enum states
 
 void setup()
 {
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
         task_arduino_fcn, /* Task function. */
         "Arduino Task",   /* String with name of task. */
         1024,             /* Stack size in bytes. */
         NULL,             /* Parameter passed as input of the task */
         0,                /* Priority of the task. */
-        NULL);            /* Task handle. */
+        NULL,             /* Task handle. */
+        0);
 
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
         task_ros_fcn, /* Task function. */
         "Ros Task",   /* String with name of task. */
         4096,         /* Stack size in bytes. */
         NULL,         /* Parameter passed as input of the task */
         1,            /* Priority of the task. */
-        NULL);        /* Task handle. */
+        NULL,         /* Task handle. */
+        1);
 }
-
 void loop()
 {
 }

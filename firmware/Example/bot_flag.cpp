@@ -46,7 +46,7 @@ bool preTS = false;
 
 int flag_xy_state = 0;
 bool isSetZero[3] = {false, false, false};
-long positions[3] = {(long)1e6, (long)-1e6, (long)-1e6};
+long positions[3] = {(long)1e10, (long)-1e10, (long)-1e10};
 long pre_positions[3];
 
 int theta[2];
@@ -116,21 +116,23 @@ enum states
 
 void setup()
 {
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
         task_arduino_fcn, /* Task function. */
         "Arduino Task",   /* String with name of task. */
         1024,             /* Stack size in bytes. */
         NULL,             /* Parameter passed as input of the task */
         0,                /* Priority of the task. */
-        NULL);            /* Task handle. */
+        NULL,             /* Task handle. */
+        0);
 
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
         task_ros_fcn, /* Task function. */
         "Ros Task",   /* String with name of task. */
         4096,         /* Stack size in bytes. */
         NULL,         /* Parameter passed as input of the task */
         1,            /* Priority of the task. */
-        NULL);        /* Task handle. */
+        NULL,         /* Task handle. */
+        1);
 }
 
 void loop()
@@ -144,6 +146,38 @@ int lim_switch(int lim_pin)
     return !digitalRead(lim_pin);
 }
 
+void set_zero_step()
+{
+    if (lim_switch(LIMIT2) == HIGH && !isSetZero[0])
+    {
+        stepM1.setSpeed(0);
+        stepM1.setCurrentPosition(0);
+        positions[0] = 0;
+        isSetZero[0] = true;
+    }
+    if (lim_switch(LIMIT1) == HIGH && !isSetZero[1])
+    {
+        stepM2.setSpeed(0);
+        stepM2.setCurrentPosition(0);
+        positions[1] = 0;
+        isSetZero[1] = true;
+    }
+    if (lim_switch(LIMIT3) == HIGH && !isSetZero[2])
+    {
+        stepM3.setSpeed(0);
+        stepM3.setCurrentPosition(0);
+        positions[2] = 0;
+        isSetZero[2] = true;
+    }
+    if (isSetZero[0] && isSetZero[1] && isSetZero[2] && flag_xy_state == 0)
+    {
+        positions[0] = -70000;
+        positions[1] = 70000;
+        positions[2] = 8000;
+        flag_xy_state = 1;
+    }
+}
+
 void task_arduino_fcn(void *arg)
 {
     pinMode(LIMIT1, INPUT_PULLUP);
@@ -153,9 +187,9 @@ void task_arduino_fcn(void *arg)
     stepM1.setMaxSpeed(STEP1_SPEED);
     stepM2.setMaxSpeed(STEP2_SPEED);
     stepM3.setMaxSpeed(STEP3_SPEED);
-    stepM1.setAcceleration(STEP1_SPEED);
-    stepM2.setAcceleration(STEP2_SPEED);
-    stepM3.setAcceleration(STEP3_SPEED);
+    stepM1.setAcceleration(STEP1_SPEED * 1.25);
+    stepM2.setAcceleration(STEP2_SPEED * 1.25);
+    stepM3.setAcceleration(STEP3_SPEED * 1.25);
 
     multiStep.addStepper(stepM1);
     multiStep.addStepper(stepM2);
@@ -218,38 +252,6 @@ void task_arduino_fcn(void *arg)
                 flag_xy_state = 0;
             }
         }
-    }
-}
-
-void set_zero_step()
-{
-    if (lim_switch(LIMIT2) == HIGH && !isSetZero[0])
-    {
-        stepM1.setSpeed(0);
-        stepM1.setCurrentPosition(0);
-        positions[0] = 0;
-        isSetZero[0] = true;
-    }
-    if (lim_switch(LIMIT1) == HIGH && !isSetZero[1])
-    {
-        stepM2.setSpeed(0);
-        stepM2.setCurrentPosition(0);
-        positions[1] = 0;
-        isSetZero[1] = true;
-    }
-    if (lim_switch(LIMIT3) == HIGH && !isSetZero[2])
-    {
-        stepM3.setSpeed(0);
-        stepM3.setCurrentPosition(0);
-        positions[2] = 0;
-        isSetZero[2] = true;
-    }
-    if (isSetZero[0] && isSetZero[1] && isSetZero[2])
-    {
-        positions[0] = -45000;
-        positions[1] = 35000;
-        positions[2] = ((float)179000 / 0.46) * 0.4;
-        flag_xy_state = 1;
     }
 }
 
@@ -381,9 +383,9 @@ void renew()
 {
     servos[0].write(0);
     servos[1].write(90);
-    positions[0] = 1e6;
-    positions[1] = -1e6;
-    positions[2] = -1e6;
+    positions[0] = 1e10;
+    positions[1] = -1e10;
+    positions[2] = -1e10;
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -393,9 +395,9 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     (void)last_call_time;
     if (timer != NULL)
     {
-        debug_msg.linear.x = lim_switch(LIMIT1);
-        debug_msg.linear.y = lim_switch(LIMIT2);
-        debug_msg.linear.z = lim_switch(LIMIT3);
+        debug_msg.linear.x = stepM1.speed();
+        debug_msg.linear.y = stepM2.speed();
+        debug_msg.linear.z = stepM3.speed();
 
         step_msg.linear.x = stepM1.currentPosition();
         step_msg.linear.y = stepM2.currentPosition();
@@ -416,12 +418,13 @@ void sub_position_callback(const void *msgin)
     angular = flagGripper.getAngular(position_msg->x, position_msg->y);
     if ((position_msg->x != 0) || (position_msg->y != 0))
     {
-        positions[0] = ((float)-177000 / 90) * constrain(angular.angular_a, -5, 120);
-        positions[1] = ((float)177000 / 90) * constrain(angular.angular_b, -5, 120);
+        positions[0] = ((float)-330000 / 90) * constrain(angular.angular_a, -10, 120);
+        positions[1] = ((float)330000 / 90) * constrain(angular.angular_b, -10, 120);
     }
     if (position_msg->z != 0)
     {
-        positions[2] = ((float)179000 / 0.46) * constrain(position_msg->z, 0, 0.46);
+        positions[2] = ((float)415000 / 0.455) * constrain(position_msg->z, 0, 0.455);
+        // positions[2] = position_msg->z;
     }
     debug_msg.angular.x = angular.angular_a;
     debug_msg.angular.y = angular.angular_b;
@@ -431,6 +434,6 @@ void sub_position_callback(const void *msgin)
 void sub_hand_callback(const void *msgin)
 {
     const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
-    theta[0] = hand_msg->x;
-    // theta[1] = hand_msg->y;
+    theta[0] = (int)hand_msg->x;
+    theta[1] = (int)hand_msg->y;
 }

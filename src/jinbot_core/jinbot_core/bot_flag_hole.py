@@ -15,7 +15,7 @@ from cv_bridge import CvBridge
 
 class BotFlagModel(Node):
     def __init__(self):
-        super().__init__("flag_grip_model_node")
+        super().__init__("flag_grip_hole_node")
         self.sent_tune_gripper = self.create_publisher(
             Float32, "gripper/flag/hole", qos_profile=qos.qos_profile_system_default
         )

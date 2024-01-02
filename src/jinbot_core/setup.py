@@ -17,6 +17,12 @@ setup(
         (os.path.join("share", package_name, "rviz"), glob("rviz/*.yaml")),
         (os.path.join("share", package_name, "maps"), glob("maps/*")),
         (os.path.join("share", package_name, "weights"), glob("weights/*")),
+        (os.path.join("share", package_name, "urdf"), glob("urdf/*.xacro")),
+        (
+            os.path.join("share", package_name, "urdf/sensors"),
+            glob("urdf/sensors/*.xacro"),
+        ),
+        (os.path.join("share", package_name, "urdf/model"), glob("urdf/model/*.STL")),
     ],
     install_requires=["setuptools"],
     zip_safe=True,
