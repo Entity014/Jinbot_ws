@@ -8,7 +8,7 @@
 
 #define STEP1_SPEED 40000
 #define STEP2_SPEED 40000
-#define STEP3_SPEED 41000
+#define STEP3_SPEED 43400
 #define LENGTH_A 0.293
 #define LENGTH_B 0.352
 #define LENGTH_C 0.352
@@ -34,5 +34,13 @@
 #define LIMIT1 18
 #define LIMIT2 21
 #define LIMIT3 35
+
+// type definitions
+#define TASK_MICROROS_PRIO 1
+#define TASK_MICROROS_CORE 1
+#define TASK_MICROROS_BYTES (int)pow(2, 14) // 12 -> 4096
+#define TASK_ARDUINO_PRIO 0
+#define TASK_ARDUINO_CORE 0
+#define TASK_ARDUINO_BYTES (int)pow(2, 12) // 11 -> 2048
 
 #endif

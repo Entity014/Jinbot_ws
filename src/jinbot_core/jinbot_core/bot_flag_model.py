@@ -42,8 +42,8 @@ class BotFlagModel(Node):
             ],
         )
         self.tuning = 90.0
-        self.diff_tuning = 1.0
-        self.frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        self.diff_tuning = 8.0
+        self.frame = np.zeros((760, 600, 3), dtype=np.uint8)
         self.mainros_state = 0
 
         self.max_range = (
@@ -73,16 +73,17 @@ class BotFlagModel(Node):
                 self.frame = cv2.flip(self.frame, 0)
                 self.frame = cv2.flip(self.frame, 1)
                 hsv_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
-                dil_frame_mask = dilate_frame(hsv_frame, 50, 0, 69, 43)
+                # dil_frame_mask = dilate_frame(hsv_frame, 50, 0, 69, 43)
+                dil_frame_mask = dilate_frame(hsv_frame)
                 self.search_contours(dil_frame_mask)
-                if self.cX > 380:
+                if self.cX > 400:
                     self.tuning += self.diff_tuning
-                elif self.cX < 370:
+                elif self.cX < 350:
                     self.tuning -= self.diff_tuning
                 # self.tuning = np.interp(self.cX, [0, 760], [50, 130])
                 msg_tuning.data = self.tuning
                 self.sent_tune_gripper.publish(msg_tuning)
-                # cv2.imshow("frame", self.frame)
+                cv2.imshow("frame", self.frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 cv2.destroyAllWindows()
@@ -110,7 +111,7 @@ class BotFlagModel(Node):
             epsilon = 0.01 * cv2.arcLength(contour, True)
             approx = cv2.approxPolyDP(contour, epsilon, True)
             num_vertices = len(approx)
-            if area > 1000:
+            if area > 10000:
                 M = cv2.moments(contour)
                 if M["m00"] != 0:
                     self.cX = int(M["m10"] / M["m00"])
@@ -122,9 +123,9 @@ class BotFlagModel(Node):
                 cv2.circle(self.frame, (380, 300), 7, (255, 0, 0), -1)
 
 
-def dilate_frame(frame, hue, diff=0, sl=0, vl=0):
-    lower_hsv = np.array([constrain(hue - diff, 0, 179), sl, vl])
-    upper_hsv = np.array([179, 255, 255])
+def dilate_frame(frame, diff=0, sl=0, vl=0):
+    lower_hsv = np.array([constrain(0 - diff, 0, 179), sl, vl])
+    upper_hsv = np.array([179, 255, 120])
     mask = cv2.inRange(frame, lower_hsv, upper_hsv)
     # res_frame = cv2.bitwise_or(frame, frame, mask=mask)
     # gray_frame = cv2.cvtColor(res_frame, cv2.COLOR_BGR2GRAY)

@@ -32,13 +32,13 @@ def generate_launch_description():
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_2"],
+        arguments=["serial", "--dev", "/dev/esp32_1"],
     )
     node_microros3 = Node(
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_3"],
+        arguments=["serial", "--dev", "/dev/esp32_2"],
     )
     node_microros4 = Node(
         package="micro_ros_agent",
@@ -64,6 +64,7 @@ def generate_launch_description():
     node_model_flag = Node(
         package="jinbot_core", executable="model_flag_node", parameters=[config_path]
     )
+    node_hole_flag = Node(package="jinbot_core", executable="hole_flag_node")
     node_joy = Node(package="joy", executable="joy_node")
     node_joyd = Node(package="jinbot_core", executable="joy_node")
 
@@ -88,16 +89,17 @@ def generate_launch_description():
     )
 
     ld.add_action(node_microros1)
-    # ld.add_action(node_microros2)
-    # ld.add_action(node_microros3)
+    ld.add_action(node_microros2)
+    ld.add_action(node_microros3)
     # ld.add_action(node_microros4)
     # ld.add_action(node_microros5)
     ld.add_action(node_joy)
     ld.add_action(node_joyd)
     ld.add_action(node_drive)
-    ld.add_action(node_flag)
+    # ld.add_action(node_flag)
     ld.add_action(node_state)
-    ld.add_action(node_model_flag)
+    # ld.add_action(node_model_flag)
+    # ld.add_action(node_hole_flag)
     # ld.add_action(launch_lidar)
     ld.add_action(node_lidar_filter)
     ld.add_action(node_localization)

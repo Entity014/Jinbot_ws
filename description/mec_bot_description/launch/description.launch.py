@@ -37,7 +37,7 @@ def generate_launch_description():
                 description="Launch joint_states_publisher",
             ),
             DeclareLaunchArgument(
-                name="rviz", default_value="false", description="Run rviz"
+                name="rviz", default_value="true", description="Run rviz"
             ),
             DeclareLaunchArgument(
                 name="use_sim_time",

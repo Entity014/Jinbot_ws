@@ -75,7 +75,7 @@ def find_HSV(source, mode: str):
         cv2.imshow("Trackbars", cv2.resize(stacked, None, fx=0.4, fy=0.4))
 
         # If the user presses ESC then exit the program
-        key = cv2.waitKey(1)
+        key = cv2.waitKey(30)
         if key == 27:
             break
 
@@ -102,4 +102,7 @@ if __name__ == "__main__":
     # ? S to save hsv.npy
     # ? Mode is [ CAM, IMG, VIDEO ]
     # ? CAM mode source only int
-    find_HSV(source="/dev/video2", mode="cam")
+    find_HSV(
+        source="413418293_396375729407054_4636177324837358434_n.jpg",
+        mode="img",
+    )

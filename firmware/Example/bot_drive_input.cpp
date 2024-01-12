@@ -6,7 +6,6 @@
 #include <kinematics.h>
 #include <pid.h>
 #include <odometry.h>
-#include <imu.h>
 #include <ESP32Encoder.h>
 
 #include <rcl/rcl.h>
@@ -15,7 +14,6 @@
 #include <rclc/executor.h>
 
 #include <std_msgs/msg/int8.h>
-#include <sensor_msgs/msg/imu.h>
 #include <nav_msgs/msg/odometry.h>
 #include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/vector3.h>
@@ -74,7 +72,8 @@ Kinematics kinematics(
     LR_WHEELS_DISTANCE);
 
 Odometry odometry;
-IMU imu;
+bool isPowered = false;
+int pre_power = 1;
 
 //------------------------------ < Fuction Prototype > ------------------------------//
 void moveBase();
@@ -85,7 +84,6 @@ int lim_switch(int lim_pin);
 
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
-void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
 void sub_velocity_callback(const void *msgin);
 bool create_entities();
@@ -104,7 +102,6 @@ rclc_executor_t executor;
 std_msgs__msg__Int8 start_msg;
 std_msgs__msg__Int8 team_msg;
 std_msgs__msg__Int8 retry_msg;
-sensor_msgs__msg__Imu imu_msg;
 nav_msgs__msg__Odometry odom_msg;
 geometry_msgs__msg__Twist pwm_msg;
 geometry_msgs__msg__Twist debug_msg;
@@ -113,7 +110,6 @@ geometry_msgs__msg__Twist velocity_msg;
 // ? define publisher
 rcl_publisher_t pub_debug;
 rcl_publisher_t pub_odom;
-rcl_publisher_t pub_imu;
 rcl_publisher_t pub_pwm;
 rcl_publisher_t pub_start;
 rcl_publisher_t pub_team;
@@ -140,7 +136,6 @@ void setup()
 {
     Serial.begin(115200);
     set_microros_serial_transports(Serial);
-    imu.init();
     motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
     motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
     motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
@@ -188,7 +183,6 @@ void loop()
 }
 
 //------------------------------ < Fuction > ----------------------------------------//
-
 int lim_switch(int lim_pin)
 {
     return !digitalRead(lim_pin);
@@ -265,21 +259,27 @@ void publishData()
 {
 
     odom_msg = odometry.getData();
-    imu_msg = imu.getData();
 
-    start_msg.data = lim_switch(START_BUTTON);
-    team_msg.data = lim_switch(TEAM_BUTTON);
-    retry_msg.data = lim_switch(RETRY_BUTTON);
+    if (isPowered)
+    {
+        start_msg.data = lim_switch(START_BUTTON);
+        team_msg.data = lim_switch(TEAM_BUTTON);
+        retry_msg.data = lim_switch(RETRY_BUTTON);
+    }
+    if (pre_power != lim_switch(START_BUTTON))
+    {
+        if (lim_switch(START_BUTTON) == 0)
+        {
+            isPowered = true;
+        }
+        pre_power = lim_switch(START_BUTTON);
+    }
     struct timespec time_stamp = getTime();
 
     odom_msg.header.stamp.sec = time_stamp.tv_sec;
     odom_msg.header.stamp.nanosec = time_stamp.tv_nsec;
 
-    imu_msg.header.stamp.sec = time_stamp.tv_sec;
-    imu_msg.header.stamp.nanosec = time_stamp.tv_nsec;
-
     RCSOFTCHECK(rcl_publish(&pub_pwm, &pwm_msg, NULL));
-    RCSOFTCHECK(rcl_publish(&pub_imu, &imu_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pub_team, &team_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pub_odom, &odom_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pub_start, &start_msg, NULL));
@@ -288,7 +288,6 @@ void publishData()
 }
 
 //------------------------------ < Ros Fuction > ------------------------------------//
-
 bool create_entities()
 {
     allocator = rcl_get_default_allocator();
@@ -327,11 +326,6 @@ bool create_entities()
         ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
         "odom/unfiltered"));
     RCCHECK(rclc_publisher_init_default(
-        &pub_imu,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
-        "imu/data"));
-    RCCHECK(rclc_publisher_init_default(
         &pub_start,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
@@ -369,7 +363,6 @@ void destroy_entities()
     (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
     rcl_publisher_fini(&pub_pwm, &node);
-    rcl_publisher_fini(&pub_imu, &node);
     rcl_publisher_fini(&pub_team, &node);
     rcl_publisher_fini(&pub_odom, &node);
     rcl_publisher_fini(&pub_start, &node);

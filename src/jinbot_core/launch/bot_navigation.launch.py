@@ -36,15 +36,13 @@ def generate_launch_description():
         [FindPackageShare("nav2_bringup"), "launch", "bringup_launch.py"]
     )
 
-    launch_nav = (
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(nav2_launch_path),
-            launch_arguments={
-                "map": LaunchConfiguration("map"),
-                "use_sim_time": LaunchConfiguration("sim"),
-                "params_file": nav2_config_path,
-            }.items(),
-        ),
+    launch_nav = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(nav2_launch_path),
+        launch_arguments={
+            "map": LaunchConfiguration("map"),
+            "use_sim_time": LaunchConfiguration("sim"),
+            "params_file": nav2_config_path,
+        }.items(),
     )
     launch_lidar = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(lidar_launch_path),

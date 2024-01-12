@@ -13,6 +13,7 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
+#include <std_msgs/msg/int8.h>
 #include <geometry_msgs/msg/vector3.h>
 #include <geometry_msgs/msg/point.h>
 #include <geometry_msgs/msg/twist.h>
@@ -52,6 +53,8 @@ long pre_positions[3];
 int theta[2];
 int pre_theta[2];
 
+int main_ros_state = 0;
+
 Servo servos[2];
 
 AccelStepper stepM1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
@@ -74,6 +77,7 @@ void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
 void sub_position_callback(const void *msgin);
 void sub_hand_callback(const void *msgin);
+void sub_main_ros_callback(const void *msgin);
 bool create_entities();
 void destroy_entities();
 void renew();
@@ -87,6 +91,7 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
+std_msgs__msg__Int8 main_ros_msg;
 geometry_msgs__msg__Twist step_msg;
 geometry_msgs__msg__Twist debug_msg;
 geometry_msgs__msg__Vector3 hand_msg;
@@ -99,6 +104,7 @@ rcl_publisher_t pub_step;
 // ? define subscriber
 rcl_subscription_t sub_position;
 rcl_subscription_t sub_hand;
+rcl_subscription_t sub_main_ros;
 
 rcl_init_options_t init_options;
 
@@ -117,22 +123,22 @@ enum states
 void setup()
 {
     xTaskCreatePinnedToCore(
-        task_arduino_fcn, /* Task function. */
-        "Arduino Task",   /* String with name of task. */
-        1024,             /* Stack size in bytes. */
-        NULL,             /* Parameter passed as input of the task */
-        0,                /* Priority of the task. */
-        NULL,             /* Task handle. */
-        0);
+        task_arduino_fcn,   /* Task function. */
+        "Arduino Task",     /* String with name of task. */
+        TASK_ARDUINO_BYTES, /* Stack size in bytes. */
+        NULL,               /* Parameter passed as input of the task */
+        TASK_ARDUINO_PRIO,  /* Priority of the task. */
+        NULL,               /* Task handle. */
+        TASK_ARDUINO_CORE);
 
     xTaskCreatePinnedToCore(
-        task_ros_fcn, /* Task function. */
-        "Ros Task",   /* String with name of task. */
-        4096,         /* Stack size in bytes. */
-        NULL,         /* Parameter passed as input of the task */
-        1,            /* Priority of the task. */
-        NULL,         /* Task handle. */
-        1);
+        task_ros_fcn,        /* Task function. */
+        "Ros Task",          /* String with name of task. */
+        TASK_MICROROS_BYTES, /* Stack size in bytes. */
+        NULL,                /* Parameter passed as input of the task */
+        TASK_MICROROS_PRIO,  /* Priority of the task. */
+        NULL,                /* Task handle. */
+        TASK_MICROROS_PRIO);
 }
 
 void loop()
@@ -171,8 +177,8 @@ void set_zero_step()
     }
     if (isSetZero[0] && isSetZero[1] && isSetZero[2] && flag_xy_state == 0)
     {
-        positions[0] = -70000;
-        positions[1] = 70000;
+        positions[0] = -67000;
+        positions[1] = 67000;
         positions[2] = 8000;
         flag_xy_state = 1;
     }
@@ -353,12 +359,18 @@ bool create_entities()
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3),
         "gripper/flag/hand"));
+    RCCHECK(rclc_subscription_init_default(
+        &sub_main_ros,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
+        "state/main_ros"));
 
     // TODO: create executor
     executor = rclc_executor_get_zero_initialized_executor();
-    RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+    RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
     RCCHECK(rclc_executor_add_subscription(&executor, &sub_position, &position_msg, &sub_position_callback, ON_NEW_DATA));
     RCCHECK(rclc_executor_add_subscription(&executor, &sub_hand, &hand_msg, &sub_hand_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_add_subscription(&executor, &sub_main_ros, &main_ros_msg, &sub_main_ros_callback, ON_NEW_DATA));
     RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
     return true;
@@ -373,6 +385,7 @@ void destroy_entities()
     rcl_publisher_fini(&pub_step, &node);
     rcl_subscription_fini(&sub_position, &node);
     rcl_subscription_fini(&sub_hand, &node);
+    rcl_subscription_fini(&sub_main_ros, &node);
     rcl_timer_fini(&timer);
     rclc_executor_fini(&executor);
     rcl_node_fini(&node);
@@ -383,9 +396,9 @@ void renew()
 {
     servos[0].write(0);
     servos[1].write(90);
-    positions[0] = 1e10;
-    positions[1] = -1e10;
-    positions[2] = -1e10;
+    positions[0] = (long)1e8;
+    positions[1] = (long)-1e8;
+    positions[2] = (long)-1e8;
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -416,10 +429,19 @@ void sub_position_callback(const void *msgin)
 {
     const geometry_msgs__msg__Point *position_msg = (const geometry_msgs__msg__Point *)msgin;
     angular = flagGripper.getAngular(position_msg->x, position_msg->y);
-    if ((position_msg->x != 0) || (position_msg->y != 0))
+    if (position_msg->y == 999)
+    {
+        positions[0] = ((float)-330000 / 90) * -10;
+        positions[1] = ((float)330000 / 90) * -10;
+    }
+    else if ((position_msg->x != 0) || (position_msg->y != 0))
     {
         positions[0] = ((float)-330000 / 90) * constrain(angular.angular_a, -10, 120);
         positions[1] = ((float)330000 / 90) * constrain(angular.angular_b, -10, 120);
+        // if (main_ros_state == 6)
+        // {
+        //   theta[1] = (int)constrain(angular.angular_c, 0, 180);
+        // }
     }
     if (position_msg->z != 0)
     {
@@ -436,4 +458,13 @@ void sub_hand_callback(const void *msgin)
     const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
     theta[0] = (int)hand_msg->x;
     theta[1] = (int)hand_msg->y;
+    // if (main_ros_state == 4)
+    // {
+    // }
+}
+
+void sub_main_ros_callback(const void *msgin)
+{
+    const std_msgs__msg__Int8 *main_ros_msg = (const std_msgs__msg__Int8 *)msgin;
+    main_ros_state = main_ros_msg->data;
 }

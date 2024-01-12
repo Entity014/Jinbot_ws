@@ -43,7 +43,7 @@ protected:
             gyro_cal_.y += gyro.y;
             gyro_cal_.z += gyro.z;
 
-            delay(50);
+            vTaskDelay(pdMS_TO_TICKS(50));
         }
 
         gyro_cal_.x = gyro_cal_.x / (float)sample_size_;
@@ -54,7 +54,8 @@ protected:
 public:
     IMUInterface()
     {
-        imu_msg_.header.frame_id = micro_ros_string_utilities_set(imu_msg_.header.frame_id, "imu_link");
+        imu_msg_.header.frame_id.data = (char *)"imu_link";
+        imu_msg_.header.frame_id.size = strlen(imu_msg_.header.frame_id.data);
     }
 
     virtual geometry_msgs__msg__Vector3 readAccelerometer() = 0;

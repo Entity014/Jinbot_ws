@@ -84,17 +84,17 @@ class BotFlag(Node):
         msg_pos = Point()
         msg_theta = Vector3()
         msg_hold = Bool()
-        # self.position_x = (
-        #     self.get_parameter("position.x").get_parameter_value().double_value
-        # )
-        # self.position_y = (
-        #     self.get_parameter("position.y").get_parameter_value().double_value
-        # )
-        # self.position_z = (
-        #     self.get_parameter("position.z").get_parameter_value().double_value
-        # )
-        # self.theta1 = self.get_parameter("theta.x").get_parameter_value().double_value
-        # self.theta2 = self.get_parameter("theta.y").get_parameter_value().double_value
+        self.position_x = (
+            self.get_parameter("position.x").get_parameter_value().double_value
+        )
+        self.position_y = (
+            self.get_parameter("position.y").get_parameter_value().double_value
+        )
+        self.position_z = (
+            self.get_parameter("position.z").get_parameter_value().double_value
+        )
+        self.theta1 = self.get_parameter("theta.x").get_parameter_value().double_value
+        self.theta2 = self.get_parameter("theta.y").get_parameter_value().double_value
         # self.theta3 = self.get_parameter("theta.z").get_parameter_value().double_value
 
         msg_pos.x = self.position_x
@@ -113,7 +113,7 @@ class BotFlag(Node):
 
     def sub_state_callback(self, msg_in):
         self.mainros_state = msg_in.data
-        self.get_logger().info(f"{self.node_state} {self.tuning}")
+        # self.get_logger().info(f"{self.node_state} {self.tuning}")
         if self.pre_node_state != self.node_state:
             if self.pre_node_state != 0:
                 self.ready_step_motor1 = False
@@ -122,24 +122,46 @@ class BotFlag(Node):
             self.pre_node_state = self.node_state
 
         if self.mainros_state == 4:
-            if self.node_state <= 2:
+            if self.node_state <= 3:
                 self.theta2 = self.tuning
 
             if self.node_state == 0:
                 self.node_state = 1
             elif self.node_state == 1 and self.ready_step_motor3:
-                self.position_y = 0.42
-                self.position_z = 0.01
+                self.position_z = 0.10
                 self.node_state = 2
+            elif self.node_state == 2 and self.ready_step_motor3:
+                self.position_y = 0.4
+                self.node_state = 3
             elif (
-                self.node_state == 2
+                self.node_state == 3
                 and self.ready_step_motor1
                 and self.ready_step_motor2
-                and self.ready_step_motor3
             ):
-                self.theta1 = 140.0
-                self.position_z = 0.40
-                self.node_state = 3
+                self.theta1 = 150.0
+                self.position_z = 0.25
+                self.node_state = 4
+            elif self.node_state == 4 and self.ready_step_motor3:
+                self.position_y = 999.0
+                self.node_state = 5
+            elif (
+                self.node_state == 5
+                and self.ready_step_motor1
+                and self.ready_step_motor2
+            ):
+                self.theta2 = 180.0
+                self.position_z = 0.2
+                self.node_state = 5
+
+            # elif (
+            #     self.node_state == 2
+            #     and self.ready_step_motor1
+            #     and self.ready_step_motor2
+            #     and self.ready_step_motor3
+            # ):
+            #     self.theta1 = 140.0
+            #     self.position_z = 0.40
+            #     self.node_state = 3
         #     elif self.node_state == 3 and self.ready_step_motor3:
         #         self.position_x = 0.001
         #         self.position_y = 0.06

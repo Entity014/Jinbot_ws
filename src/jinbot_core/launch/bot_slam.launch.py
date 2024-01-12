@@ -24,7 +24,10 @@ def generate_launch_description():
         [FindPackageShare("jinbot_core"), "config", "navigation.yaml"]
     )
     rviz_config_path = PathJoinSubstitution(
-        [FindPackageShare("jinbot_core"), "rviz", "mec_bot_slam.rviz"]
+        [FindPackageShare("jinbot_core"), "rviz", "jinbot_slam.rviz"]
+    )
+    description_launch_path = PathJoinSubstitution(
+        [FindPackageShare("jinbot_core"), "launch", "bot_description.launch.py"]
     )
 
     lidar_launch_path = PathJoinSubstitution(
@@ -39,52 +42,51 @@ def generate_launch_description():
         [FindPackageShare("nav2_bringup"), "launch", "navigation_launch.py"]
     )
 
+    launch_description = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(description_launch_path)
+    )
     launch_lidar = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(lidar_launch_path),
         launch_arguments={
             "params_file": config_path,
         }.items(),
     )
-    launch_slam = (
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(slam_launch_path),
-            launch_arguments={
-                "params_file": slam_config_path,
-            }.items(),
-        ),
+    launch_slam = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(slam_launch_path),
+        launch_arguments={
+            "params_file": slam_config_path,
+        }.items(),
     )
-    launch_nav = (
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(navigation_launch_path),
-            launch_arguments={
-                "params_file": nav2_config_path,
-            }.items(),
-        ),
+    launch_nav = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(navigation_launch_path),
+        launch_arguments={
+            "params_file": nav2_config_path,
+        }.items(),
     )
 
     node_microros1 = Node(
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_1"],
+        arguments=["serial", "--dev", "/dev/esp32_0"],
     )
     node_microros2 = Node(
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_2"],
+        arguments=["serial", "--dev", "/dev/esp32_1"],
     )
     node_microros3 = Node(
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_3"],
+        arguments=["serial", "--dev", "/dev/esp32_2"],
     )
     node_microros4 = Node(
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_4"],
+        arguments=["serial", "--dev", "/dev/esp32_3"],
     )
     node_microros5 = Node(
         package="micro_ros_agent",
@@ -131,14 +133,15 @@ def generate_launch_description():
     ld.add_action(node_microros1)
     ld.add_action(node_microros2)
     ld.add_action(node_microros3)
-    # ld.add_action(node_microros4)
+    ld.add_action(node_microros4)
     # ld.add_action(node_microros5)
-    ld.add_action(node_joy)
-    ld.add_action(node_joyd)
-    ld.add_action(node_drive)
+    # ld.add_action(node_joy)
+    # ld.add_action(node_joyd)
+    # ld.add_action(node_drive)
     # ld.add_action(node_flag)
     # ld.add_action(node_state)
     # ld.add_action(node_model_flag)
+    ld.add_action(launch_description)
     ld.add_action(launch_lidar)
     ld.add_action(node_lidar_filter)
     ld.add_action(node_localization)

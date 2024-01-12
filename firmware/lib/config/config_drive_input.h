@@ -5,9 +5,9 @@
 
 #define USE_GY87_IMU
 
-#define K_P 0.0
-#define K_I 0.0
-#define K_D 0.0
+#define K_P 0.6
+#define K_I 0.8
+#define K_D 0.5
 
 /*
 ROBOT ORIENTATION
@@ -48,7 +48,7 @@ ROBOT ORIENTATION
 
 // BUTTON PINS
 #define START_BUTTON 32
-#define TEAM_BUTTON 33
+#define TEAM_BUTTON 34
 #define RETRY_BUTTON 35
 
 // INVERT ENCODER COUNTS

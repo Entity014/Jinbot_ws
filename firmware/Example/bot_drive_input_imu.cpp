@@ -2,19 +2,15 @@
 #include <Arduino.h>
 #include <stdio.h>
 
-#include <config_drive_output.h>
-#include <motor.h>
+#include <config_drive_input.h>
+#include <imu.h>
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include <std_msgs/msg/string.h>
 #include <sensor_msgs/msg/imu.h>
-#include <nav_msgs/msg/odometry.h>
-#include <geometry_msgs/msg/twist.h>
-#include <geometry_msgs/msg/vector3.h>
 
 #define RCCHECK(fn)                  \
     {                                \
@@ -22,6 +18,13 @@
         if ((temp_rc != RCL_RET_OK)) \
         {                            \
             return false;            \
+        }                            \
+    }
+#define RCSOFTCHECK(fn)              \
+    {                                \
+        rcl_ret_t temp_rc = fn;      \
+        if ((temp_rc != RCL_RET_OK)) \
+        {                            \
         }                            \
     }
 #define EXECUTE_EVERY_N_MS(MS, X)          \
@@ -40,19 +43,16 @@
     } while (0)
 
 //------------------------------ < ESP32 Define > -----------------------------------//
-
-Motor motor1_controller(PWM_FREQUENCY, PWM_BITS, MOTOR1_INV, MOTOR1_PWM, MOTOR1_IN_A, MOTOR1_IN_B);
-Motor motor2_controller(PWM_FREQUENCY, PWM_BITS, MOTOR2_INV, MOTOR2_PWM, MOTOR2_IN_A, MOTOR2_IN_B);
+unsigned long long time_offset = 0;
+IMU imu;
 
 //------------------------------ < Fuction Prototype > ------------------------------//
-
-void task_arduino_fcn(void *arg);
-
+void syncTime();
+void publishData();
+struct timespec getTime();
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
-void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
-void sub_pwm_callback(const void *msgin);
 bool create_entities();
 void destroy_entities();
 void renew();
@@ -66,14 +66,10 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
-geometry_msgs__msg__Twist debug_msg;
-geometry_msgs__msg__Twist pwm_msg;
+sensor_msgs__msg__Imu imu_msg;
 
 // ? define publisher
-rcl_publisher_t pub_debug;
-
-// ? define subscriber
-rcl_subscription_t sub_pwm;
+rcl_publisher_t pub_imu;
 
 rcl_init_options_t init_options;
 
@@ -93,7 +89,9 @@ void setup()
 {
     Serial.begin(115200);
     set_microros_serial_transports(Serial);
+    imu.init();
 }
+
 void loop()
 {
     switch (state)
@@ -134,8 +132,42 @@ void loop()
 
 //------------------------------ < Fuction > ----------------------------------------//
 
-//------------------------------ < Ros Fuction > ------------------------------------//
+void syncTime()
+{
+    // get the current time from the agent
+    unsigned long now = millis();
+    RCSOFTCHECK(rmw_uros_sync_session(10));
+    unsigned long long ros_time_ms = rmw_uros_epoch_millis();
+    // now we can find the difference between ROS time and uC time
+    time_offset = ros_time_ms - now;
+}
 
+struct timespec getTime()
+{
+    struct timespec tp = {0};
+    // add time difference between uC time and ROS time to
+    // synchronize time with ROS
+    unsigned long long now = millis() + time_offset;
+    tp.tv_sec = now / 1000;
+    tp.tv_nsec = (now % 1000) * 1000000;
+
+    return tp;
+}
+
+void publishData()
+{
+
+    imu_msg = imu.getData();
+
+    struct timespec time_stamp = getTime();
+
+    imu_msg.header.stamp.sec = time_stamp.tv_sec;
+    imu_msg.header.stamp.nanosec = time_stamp.tv_nsec;
+
+    RCSOFTCHECK(rcl_publish(&pub_imu, &imu_msg, NULL));
+}
+
+//------------------------------ < Ros Fuction > ------------------------------------//
 bool create_entities()
 {
     allocator = rcl_get_default_allocator();
@@ -158,23 +190,15 @@ bool create_entities()
         timer_callback));
 
     // TODO: create publisher
-    RCCHECK(rclc_publisher_init_best_effort(
-        &pub_debug,
+    RCCHECK(rclc_publisher_init_default(
+        &pub_imu,
         &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-        "debug/drive/output/top"));
-
-    // TODO: create subscriber
-    RCCHECK(rclc_subscription_init_default(
-        &sub_pwm,
-        &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-        "drive/pwm"));
+        ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+        "imu/data"));
 
     // TODO: create executor
     executor = rclc_executor_get_zero_initialized_executor();
-    RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
-    RCCHECK(rclc_executor_add_subscription(&executor, &sub_pwm, &pwm_msg, &sub_pwm_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
     RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
     return true;
@@ -185,8 +209,7 @@ void destroy_entities()
     rmw_context_t *rmw_context = rcl_context_get_rmw_context(&support.context);
     (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
-    rcl_publisher_fini(&pub_debug, &node);
-    rcl_subscription_fini(&sub_pwm, &node);
+    rcl_publisher_fini(&pub_imu, &node);
     rcl_timer_fini(&timer);
     rclc_executor_fini(&executor);
     rcl_node_fini(&node);
@@ -204,18 +227,6 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
     (void)last_call_time;
     if (timer != NULL)
     {
-        debug_msg.angular.y = 0.0;
-        debug_msg.angular.z = 0.0;
-        rcl_publish(&pub_debug, &debug_msg, NULL);
+        publishData();
     }
-}
-
-//------------------------------ < Subscriber Fuction > -----------------------------//
-void sub_pwm_callback(const void *msgin)
-{
-    const geometry_msgs__msg__Twist *pwm_msg = (const geometry_msgs__msg__Twist *)msgin;
-    debug_msg.linear.x = pwm_msg->linear.x;
-    debug_msg.linear.y = pwm_msg->linear.y;
-    motor1_controller.spin((int)pwm_msg->linear.x);
-    motor2_controller.spin((int)pwm_msg->linear.y);
 }
