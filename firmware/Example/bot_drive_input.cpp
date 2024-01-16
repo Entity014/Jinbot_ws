@@ -6,7 +6,8 @@
 #include <kinematics.h>
 #include <pid.h>
 #include <odometry.h>
-#include <ESP32Encoder.h>
+// #include <ESP32Encoder.h>
+#include <encoder.h>
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
@@ -53,9 +54,12 @@ unsigned long long time_offset = 0;
 unsigned long prev_velocity_time = 0;
 unsigned long prev_odom_update = 0;
 
-ESP32Encoder motor1_encoder(COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
-ESP32Encoder motor2_encoder(COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
-ESP32Encoder motor3_encoder(COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
+// ESP32Encoder motor1_encoder(COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
+// ESP32Encoder motor2_encoder(COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
+// ESP32Encoder motor3_encoder(COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
+Encoder motor1_encoder(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B, COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
+Encoder motor2_encoder(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B, COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
+Encoder motor3_encoder(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B, COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
 
 PID motor1_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
 PID motor2_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
@@ -70,6 +74,8 @@ Kinematics kinematics(
     MOTOR_POWER_MAX_VOLTAGE,
     WHEEL_DIAMETER,
     LR_WHEELS_DISTANCE);
+
+Kinematics::pwm save_pwm;
 
 Odometry odometry;
 bool isPowered = false;
@@ -136,9 +142,9 @@ void setup()
 {
     Serial.begin(115200);
     set_microros_serial_transports(Serial);
-    motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
-    motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
-    motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
+    // motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
+    // motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
+    // motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
     pinMode(START_BUTTON, INPUT_PULLUP);
     pinMode(TEAM_BUTTON, INPUT_PULLUP);
     pinMode(RETRY_BUTTON, INPUT_PULLUP);
@@ -213,10 +219,10 @@ void moveBase()
     debug_msg.angular.z = req_rpm.motor3;
 
     Kinematics::pwm motor_pwm = kinematics.getPWM(motor1_pid.compute(req_rpm.motor1, current_rpm1), motor2_pid.compute(req_rpm.motor2, current_rpm2), motor3_pid.compute(req_rpm.motor3, current_rpm3));
-    pwm_msg.linear.x = motor_pwm.motor1;
-    pwm_msg.linear.y = motor_pwm.motor2;
-    pwm_msg.linear.z = motor_pwm.motor3;
-    pwm_msg.angular.x = motor_pwm.motor4;
+    save_pwm.motor1 = motor_pwm.motor1;
+    save_pwm.motor2 = motor_pwm.motor2;
+    save_pwm.motor3 = motor_pwm.motor3;
+    save_pwm.motor4 = motor_pwm.motor4;
 
     Kinematics::velocities current_vel = kinematics.getVelocities(
         current_rpm1,
@@ -278,6 +284,10 @@ void publishData()
 
     odom_msg.header.stamp.sec = time_stamp.tv_sec;
     odom_msg.header.stamp.nanosec = time_stamp.tv_nsec;
+    pwm_msg.linear.x = save_pwm.motor1;
+    pwm_msg.linear.y = save_pwm.motor2;
+    pwm_msg.linear.z = save_pwm.motor3;
+    pwm_msg.angular.x = save_pwm.motor4;
 
     RCSOFTCHECK(rcl_publish(&pub_pwm, &pwm_msg, NULL));
     RCSOFTCHECK(rcl_publish(&pub_team, &team_msg, NULL));

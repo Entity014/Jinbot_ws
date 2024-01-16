@@ -5,9 +5,9 @@
 
 #define USE_GY87_IMU
 
-#define K_P 0.6
+#define K_P 0.01
 #define K_I 0.8
-#define K_D 0.5
+#define K_D 0
 
 /*
 ROBOT ORIENTATION
@@ -34,14 +34,14 @@ ROBOT ORIENTATION
 #define COUNTS_PER_REV4 0   // wheel4 encoder's no of ticks per rev
 
 // ENCODER PINS
-#define MOTOR1_ENCODER_A 18
-#define MOTOR1_ENCODER_B 19
+#define MOTOR1_ENCODER_A 2
+#define MOTOR1_ENCODER_B 4
 
-#define MOTOR2_ENCODER_A 23
-#define MOTOR2_ENCODER_B 25
+#define MOTOR2_ENCODER_A 5
+#define MOTOR2_ENCODER_B 12
 
-#define MOTOR3_ENCODER_A 26
-#define MOTOR3_ENCODER_B 27
+#define MOTOR3_ENCODER_A 13
+#define MOTOR3_ENCODER_B 14
 
 #define MOTOR4_ENCODER_A -1
 #define MOTOR4_ENCODER_B -1
@@ -52,7 +52,7 @@ ROBOT ORIENTATION
 #define RETRY_BUTTON 35
 
 // INVERT ENCODER COUNTS
-#define MOTOR1_ENCODER_INV false
+#define MOTOR1_ENCODER_INV true
 #define MOTOR2_ENCODER_INV false
 #define MOTOR3_ENCODER_INV false
 #define MOTOR4_ENCODER_INV false

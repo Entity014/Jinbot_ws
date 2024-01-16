@@ -210,7 +210,7 @@ void task_arduino_fcn(void *arg)
 
     servos[0].attach(SERVO1, 1000, 2000);
     servos[1].attach(SERVO2, 1000, 2000);
-    servos[0].write(0);
+    servos[0].write(90);
     servos[1].write(90);
     while (true)
     {
@@ -394,7 +394,7 @@ void destroy_entities()
 
 void renew()
 {
-    servos[0].write(0);
+    servos[0].write(90);
     servos[1].write(90);
     positions[0] = (long)1e8;
     positions[1] = (long)-1e8;
@@ -431,13 +431,13 @@ void sub_position_callback(const void *msgin)
     angular = flagGripper.getAngular(position_msg->x, position_msg->y);
     if (position_msg->y == 999)
     {
-        positions[0] = ((float)-330000 / 90) * -10;
-        positions[1] = ((float)330000 / 90) * -10;
+        positions[0] = ((float)-330000 / 90) * -12;
+        positions[1] = ((float)330000 / 90) * -12;
     }
     else if ((position_msg->x != 0) || (position_msg->y != 0))
     {
-        positions[0] = ((float)-330000 / 90) * constrain(angular.angular_a, -10, 120);
-        positions[1] = ((float)330000 / 90) * constrain(angular.angular_b, -10, 120);
+        positions[0] = ((float)-330000 / 90) * constrain(angular.angular_a, -12, 120);
+        positions[1] = ((float)330000 / 90) * constrain(angular.angular_b, -12, 120);
         // if (main_ros_state == 6)
         // {
         //   theta[1] = (int)constrain(angular.angular_c, 0, 180);
@@ -450,7 +450,7 @@ void sub_position_callback(const void *msgin)
     }
     debug_msg.angular.x = angular.angular_a;
     debug_msg.angular.y = angular.angular_b;
-    debug_msg.angular.z = stepM3.distanceToGo();
+    debug_msg.angular.z = angular.angular_c;
 }
 
 void sub_hand_callback(const void *msgin)

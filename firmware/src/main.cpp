@@ -6,7 +6,8 @@
 #include <kinematics.h>
 #include <pid.h>
 #include <odometry.h>
-#include <ESP32Encoder.h>
+// #include <ESP32Encoder.h>
+#include <encoder.h>
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
@@ -53,9 +54,12 @@ unsigned long long time_offset = 0;
 unsigned long prev_velocity_time = 0;
 unsigned long prev_odom_update = 0;
 
-ESP32Encoder motor1_encoder(COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
-ESP32Encoder motor2_encoder(COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
-ESP32Encoder motor3_encoder(COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
+// ESP32Encoder motor1_encoder(COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
+// ESP32Encoder motor2_encoder(COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
+// ESP32Encoder motor3_encoder(COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
+Encoder motor1_encoder(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B, COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
+Encoder motor2_encoder(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B, COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
+Encoder motor3_encoder(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B, COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
 
 PID motor1_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
 PID motor2_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
@@ -136,9 +140,9 @@ void setup()
 {
   Serial.begin(115200);
   set_microros_serial_transports(Serial);
-  motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
-  motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
-  motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
+  // motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
+  // motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
+  // motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
   pinMode(START_BUTTON, INPUT_PULLUP);
   pinMode(TEAM_BUTTON, INPUT_PULLUP);
   pinMode(RETRY_BUTTON, INPUT_PULLUP);

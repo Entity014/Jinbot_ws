@@ -70,12 +70,11 @@ class BotFlagModel(Node):
             ref, self.frame = cap.read()
             if ref:
                 self.frame = cv2.resize(self.frame, (760, 600))
-                self.frame = cv2.flip(self.frame, 0)
-                self.frame = cv2.flip(self.frame, 1)
-                hsv_frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
-                # dil_frame_mask = dilate_frame(hsv_frame, 50, 0, 69, 43)
-                dil_frame_mask = dilate_frame(hsv_frame)
-                self.search_contours(dil_frame_mask)
+                self.frame = crop_vertical_half(self.frame)
+                gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
+                blurred = cv2.GaussianBlur(gray, (7, 7), 1)
+                _, threshold = cv2.threshold(blurred, 40, 255, cv2.THRESH_BINARY_INV)
+                self.search_contours(threshold)
                 if self.cX > 400:
                     self.tuning += self.diff_tuning
                 elif self.cX < 350:
@@ -83,7 +82,8 @@ class BotFlagModel(Node):
                 # self.tuning = np.interp(self.cX, [0, 760], [50, 130])
                 msg_tuning.data = self.tuning
                 self.sent_tune_gripper.publish(msg_tuning)
-                cv2.imshow("frame", self.frame)
+                # cv2.imshow("frame", self.frame)
+                # cv2.imshow("frame2", threshold)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 cv2.destroyAllWindows()
@@ -123,24 +123,18 @@ class BotFlagModel(Node):
                 cv2.circle(self.frame, (380, 300), 7, (255, 0, 0), -1)
 
 
-def dilate_frame(frame, diff=0, sl=0, vl=0):
-    lower_hsv = np.array([constrain(0 - diff, 0, 179), sl, vl])
-    upper_hsv = np.array([179, 255, 120])
-    mask = cv2.inRange(frame, lower_hsv, upper_hsv)
-    # res_frame = cv2.bitwise_or(frame, frame, mask=mask)
-    # gray_frame = cv2.cvtColor(res_frame, cv2.COLOR_BGR2GRAY)
-    # threshold = cv2.adaptiveThreshold(
-    #     mask, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2.5
-    # )
-    # canny_frame = cv2.Canny(gray_frame, 0, 255)
-    # kernel = np.ones((5, 5))
-    # cv2.imshow("color_search", canny_frame)
-    # return cv2.dilate(canny_frame, kernel, iterations=1)
-    return mask
-
-
 def constrain(value, min_val, max_val):
     return min(max_val, max(min_val, value))
+
+
+def crop_vertical_half(frame):
+    # Get the width and height of the frame
+    height, width, _ = frame.shape
+
+    # Crop the left half of the frame
+    cropped_frame = frame[: height // 2, :, :]
+
+    return cropped_frame
 
 
 def main():

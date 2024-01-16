@@ -10,4 +10,9 @@
 #define IMU GY87IMU
 #endif
 
+#ifdef USE_GY91_IMU
+// pass your built in class to IMU macro
+#define IMU GY91IMU
+#endif
+
 #endif

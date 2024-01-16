@@ -30,7 +30,7 @@ def search_contours(mask):
             cv2.circle(frame, (380, 300), 7, (255, 0, 0), -1)
 
 
-def dilate_frame(hue, diff=0, sl=0, vl=0):
+def dilate_frame(hue=0, diff=0, sl=0, vl=0):
     lower_hsv = np.array([constrain(hue - diff, 0, 179), sl, vl])
     upper_hsv = np.array([179, 255, 255])
     mask = cv2.inRange(hsv_frame, lower_hsv, upper_hsv)
@@ -56,9 +56,9 @@ while cap.isOpened():
     frame = cv2.rotate(frame, 1)
     # frame_copy = frame.copy()
     hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    dil_frame_mask = dilate_frame(50, 0, 69, 43)
+    dil_frame_mask = dilate_frame()
     search_contours(dil_frame_mask)
-    print(np.interp(cX, [0, 760], [0, 180]))
+    # print(np.interp(cX, [0, 760], [0, 180]))
 
     cv2.imshow("frame1", dil_frame_mask)
     cv2.imshow("frame", frame)

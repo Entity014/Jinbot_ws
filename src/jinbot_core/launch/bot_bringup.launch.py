@@ -44,9 +44,15 @@ def generate_launch_description():
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_4"],
+        arguments=["serial", "--dev", "/dev/esp32_3"],
     )
     node_microros5 = Node(
+        package="micro_ros_agent",
+        executable="micro_ros_agent",
+        output="screen",
+        arguments=["serial", "--dev", "/dev/esp32_4"],
+    )
+    node_microros6 = Node(
         package="micro_ros_agent",
         executable="micro_ros_agent",
         output="screen",
@@ -91,10 +97,11 @@ def generate_launch_description():
     ld.add_action(node_microros1)
     ld.add_action(node_microros2)
     ld.add_action(node_microros3)
-    # ld.add_action(node_microros4)
+    ld.add_action(node_microros4)
     # ld.add_action(node_microros5)
-    ld.add_action(node_joy)
-    ld.add_action(node_joyd)
+    # ld.add_action(node_microros6)
+    # ld.add_action(node_joy)
+    # ld.add_action(node_joyd)
     ld.add_action(node_drive)
     # ld.add_action(node_flag)
     ld.add_action(node_state)
