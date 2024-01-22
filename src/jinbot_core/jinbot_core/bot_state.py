@@ -87,11 +87,11 @@ class BotState(Node):
         # self.state_main_ros = (
         #     self.get_parameter("main_ros").get_parameter_value().integer_value
         # )
-        self.state_retry = (
-            self.get_parameter("retry").get_parameter_value().string_value
-        )
-        self.state_main = self.get_parameter("main").get_parameter_value().string_value
-        self.state_team = self.get_parameter("team").get_parameter_value().string_value
+        # self.state_retry = (
+        #     self.get_parameter("retry").get_parameter_value().string_value
+        # )
+        # self.state_main = self.get_parameter("main").get_parameter_value().string_value
+        # self.state_team = self.get_parameter("team").get_parameter_value().string_value
 
         if self.state_main == "Start":
             if self.state_main_ros == 1:
@@ -105,6 +105,15 @@ class BotState(Node):
             elif self.state_main_ros == 5:
                 self.state_main_ros = 6
         elif self.state_main == "Reset":
+            if self.retry_order == "First":
+                self.state_main_ros = 1
+            elif self.retry_order == "Second":
+                self.state_main_ros = 7
+                if self.state_main_ros == 7:
+                    self.state_main_ros = 8
+                if self.state_main_ros == 8:
+                    self.state_main_ros = 9
+        else:
             self.state_main_ros = 1
 
         msg_state_main_ros.data = self.state_main_ros
@@ -139,11 +148,9 @@ class BotState(Node):
             self.pre_team_button = msg.data
 
         if self.team_order == 0:
-            self.state_team = "None"
+            self.state_team = "Blue"
         elif self.team_order == 1:
-            self.state_team = "First"
-        elif self.team_order == 2:
-            self.state_team = "Second"
+            self.state_team = "Red"
         else:
             self.team_order = 0
 
@@ -154,9 +161,11 @@ class BotState(Node):
             self.pre_retry_button = msg.data
 
         if self.retry_order == 0:
-            self.state_retry = "Blue"
+            self.state_retry = "None"
         elif self.retry_order == 1:
-            self.state_retry = "Red"
+            self.state_retry = "First"
+        elif self.retry_order == 2:
+            self.state_retry = "Second"
         else:
             self.retry_order = 0
 

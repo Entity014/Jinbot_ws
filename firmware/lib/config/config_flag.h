@@ -38,9 +38,9 @@
 // type definitions
 #define TASK_MICROROS_PRIO 1
 #define TASK_MICROROS_CORE 1
-#define TASK_MICROROS_BYTES (int)pow(2, 14) // 12 -> 4096
+#define TASK_MICROROS_BYTES (int)pow(2, 15) // 12 -> 4096
 #define TASK_ARDUINO_PRIO 0
 #define TASK_ARDUINO_CORE 0
-#define TASK_ARDUINO_BYTES (int)pow(2, 13) // 11 -> 2048
+#define TASK_ARDUINO_BYTES (int)pow(2, 14) // 11 -> 2048
 
 #endif

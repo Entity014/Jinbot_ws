@@ -39,7 +39,8 @@ public:
     };
     Kinematics(base robot_base, int motor_max_rpm, float max_rpm_ratio,
                float motor_operating_voltage, float motor_power_max_voltage,
-               float wheel_diameter, float wheels_y_distance);
+               float wheel_diameter, float wheels_y_distance,
+               float min_pwm, float max_pwm);
     velocities getVelocities(float rpm1, float rpm2, float rpm3);
     rpm getRPM(float linear_x, float linear_y, float angular_z);
     pwm getPWM(float pwm1, float pwm2, float pwm3);
@@ -48,9 +49,10 @@ public:
 private:
     rpm calculateRPM(float linear_x, float linear_y, float angular_z);
     pwm calculatePWM(float pwm1, float pwm2, float pwm3);
-    int signum(int value);
     int getTotalWheels(base robot_base);
 
+    float min_pwm_;
+    float max_pwm_;
     float max_rpm_;
     float wheels_y_distance_;
     float pwm_res_;

@@ -6,7 +6,6 @@
 #include <kinematics.h>
 #include <pid.h>
 #include <odometry.h>
-// #include <ESP32Encoder.h>
 #include <encoder.h>
 
 #include <rcl/rcl.h>
@@ -18,6 +17,9 @@
 #include <nav_msgs/msg/odometry.h>
 #include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/vector3.h>
+
+#define ENCODER_USE_INTERRUPTS
+#define ENCODER_OPTIMIZE_INTERRUPTS
 
 #define RCCHECK(fn)              \
   {                              \
@@ -54,9 +56,6 @@ unsigned long long time_offset = 0;
 unsigned long prev_velocity_time = 0;
 unsigned long prev_odom_update = 0;
 
-// ESP32Encoder motor1_encoder(COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
-// ESP32Encoder motor2_encoder(COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
-// ESP32Encoder motor3_encoder(COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
 Encoder motor1_encoder(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B, COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
 Encoder motor2_encoder(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B, COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
 Encoder motor3_encoder(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B, COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
@@ -73,11 +72,10 @@ Kinematics kinematics(
     MOTOR_OPERATING_VOLTAGE,
     MOTOR_POWER_MAX_VOLTAGE,
     WHEEL_DIAMETER,
-    LR_WHEELS_DISTANCE);
+    LR_WHEELS_DISTANCE,
+    PWM_MIN, PWM_MAX);
 
 Odometry odometry;
-bool isPowered = false;
-int pre_power = 1;
 
 //------------------------------ < Fuction Prototype > ------------------------------//
 void moveBase();
@@ -140,9 +138,6 @@ void setup()
 {
   Serial.begin(115200);
   set_microros_serial_transports(Serial);
-  // motor1_encoder.attachSingleEdge(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B);
-  // motor2_encoder.attachSingleEdge(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B);
-  // motor3_encoder.attachSingleEdge(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B);
   pinMode(START_BUTTON, INPUT_PULLUP);
   pinMode(TEAM_BUTTON, INPUT_PULLUP);
   pinMode(RETRY_BUTTON, INPUT_PULLUP);
@@ -206,8 +201,8 @@ void moveBase()
       velocity_msg.linear.y,
       velocity_msg.angular.z);
 
-  float current_rpm1 = motor1_encoder.getRPM();
-  float current_rpm2 = motor2_encoder.getRPM();
+  float current_rpm1 = motor2_encoder.getRPM();
+  float current_rpm2 = motor1_encoder.getRPM();
   float current_rpm3 = motor3_encoder.getRPM();
   debug_msg.linear.x = current_rpm1;
   debug_msg.linear.y = current_rpm2;
@@ -264,20 +259,9 @@ void publishData()
 
   odom_msg = odometry.getData();
 
-  if (isPowered)
-  {
-    start_msg.data = lim_switch(START_BUTTON);
-    team_msg.data = lim_switch(TEAM_BUTTON);
-    retry_msg.data = lim_switch(RETRY_BUTTON);
-  }
-  if (pre_power != lim_switch(START_BUTTON))
-  {
-    if (lim_switch(START_BUTTON) == 0)
-    {
-      isPowered = true;
-    }
-    pre_power = lim_switch(START_BUTTON);
-  }
+  start_msg.data = lim_switch(START_BUTTON);
+  team_msg.data = lim_switch(TEAM_BUTTON);
+  retry_msg.data = lim_switch(RETRY_BUTTON);
   struct timespec time_stamp = getTime();
 
   odom_msg.header.stamp.sec = time_stamp.tv_sec;

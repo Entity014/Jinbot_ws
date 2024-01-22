@@ -10,10 +10,6 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     ld = LaunchDescription()
-
-    config_path = PathJoinSubstitution(
-        [FindPackageShare("jinbot_core"), "config", "params.yaml"]
-    )
     ekf_config_path = PathJoinSubstitution(
         [FindPackageShare("jinbot_core"), "config", "ekf.yaml"]
     )
@@ -30,10 +26,6 @@ def generate_launch_description():
         [FindPackageShare("jinbot_core"), "launch", "bot_description.launch.py"]
     )
 
-    lidar_launch_path = PathJoinSubstitution(
-        [FindPackageShare("sllidar_ros2"), "launch", "sllidar_a3_launch.py"]
-    )
-
     slam_launch_path = PathJoinSubstitution(
         [FindPackageShare("slam_toolbox"), "launch", "online_async_launch.py"]
     )
@@ -45,16 +37,10 @@ def generate_launch_description():
     launch_description = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(description_launch_path)
     )
-    launch_lidar = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(lidar_launch_path),
-        launch_arguments={
-            "params_file": config_path,
-        }.items(),
-    )
     launch_slam = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(slam_launch_path),
         launch_arguments={
-            "params_file": slam_config_path,
+            "slam_params_file": slam_config_path,
         }.items(),
     )
     launch_nav = IncludeLaunchDescription(
@@ -64,56 +50,6 @@ def generate_launch_description():
         }.items(),
     )
 
-    node_microros1 = Node(
-        package="micro_ros_agent",
-        executable="micro_ros_agent",
-        output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_0"],
-    )
-    node_microros2 = Node(
-        package="micro_ros_agent",
-        executable="micro_ros_agent",
-        output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_1"],
-    )
-    node_microros3 = Node(
-        package="micro_ros_agent",
-        executable="micro_ros_agent",
-        output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_2"],
-    )
-    node_microros4 = Node(
-        package="micro_ros_agent",
-        executable="micro_ros_agent",
-        output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_3"],
-    )
-    node_microros5 = Node(
-        package="micro_ros_agent",
-        executable="micro_ros_agent",
-        output="screen",
-        arguments=["serial", "--dev", "/dev/esp32_5"],
-    )
-    node_drive = Node(
-        package="jinbot_core", executable="drive_node", parameters=[config_path]
-    )
-    node_flag = Node(
-        package="jinbot_core", executable="flag_node", parameters=[config_path]
-    )
-    node_state = Node(
-        package="jinbot_core", executable="state_node", parameters=[config_path]
-    )
-    node_model_flag = Node(
-        package="jinbot_core", executable="model_flag_node", parameters=[config_path]
-    )
-    node_joy = Node(package="joy", executable="joy_node")
-    node_joyd = Node(package="jinbot_core", executable="joy_node")
-
-    node_lidar_filter = Node(
-        package="laser_filters",
-        executable="scan_to_scan_filter_chain",
-        parameters=[config_path],
-    )
     node_localization = Node(
         package="robot_localization",
         executable="ekf_node",
@@ -129,24 +65,10 @@ def generate_launch_description():
         output="screen",
         arguments=["-d", rviz_config_path],
     )
-
-    ld.add_action(node_microros1)
-    ld.add_action(node_microros2)
-    ld.add_action(node_microros3)
-    ld.add_action(node_microros4)
-    # ld.add_action(node_microros5)
-    # ld.add_action(node_joy)
-    # ld.add_action(node_joyd)
-    # ld.add_action(node_drive)
-    # ld.add_action(node_flag)
-    # ld.add_action(node_state)
-    # ld.add_action(node_model_flag)
     ld.add_action(launch_description)
-    ld.add_action(launch_lidar)
-    ld.add_action(node_lidar_filter)
     ld.add_action(node_localization)
-    ld.add_action(launch_slam)
     ld.add_action(launch_nav)
+    ld.add_action(launch_slam)
     ld.add_action(node_rviz)
 
     return ld

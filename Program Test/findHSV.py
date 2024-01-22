@@ -103,6 +103,6 @@ if __name__ == "__main__":
     # ? Mode is [ CAM, IMG, VIDEO ]
     # ? CAM mode source only int
     find_HSV(
-        source="/dev/video2",
-        mode="cam",
+        source="My Movie 1.mov",
+        mode="video",
     )

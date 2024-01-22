@@ -3,23 +3,19 @@
 
 Kinematics::Kinematics(base robot_base, int motor_max_rpm, float max_rpm_ratio,
                        float motor_operating_voltage, float motor_power_max_voltage,
-                       float wheel_diameter, float wheels_y_distance) : base_platform_(robot_base),
-                                                                        wheels_y_distance_(wheels_y_distance),
-                                                                        wheel_circumference_(PI * wheel_diameter),
-                                                                        total_wheels_(getTotalWheels(robot_base))
+                       float wheel_diameter, float wheels_y_distance, float min_pwm,
+                       float max_pwm) : base_platform_(robot_base),
+                                        wheels_y_distance_(wheels_y_distance),
+                                        wheel_circumference_(PI * wheel_diameter),
+                                        total_wheels_(getTotalWheels(robot_base)),
+                                        min_pwm_(min_pwm),
+                                        max_pwm_(max_pwm)
 {
     motor_power_max_voltage = constrain(motor_power_max_voltage, 0, motor_operating_voltage);
     max_rpm_ = ((motor_power_max_voltage / motor_operating_voltage) * motor_max_rpm) * max_rpm_ratio;
 }
 
-int Kinematics::signum(int value)
-{
-    return (value > 0) ? 1 : (value < 0) ? -1
-                                         : 0;
-}
-
-Kinematics::rpm
-Kinematics::calculateRPM(float linear_x, float linear_y, float angular_z)
+Kinematics::rpm Kinematics::calculateRPM(float linear_x, float linear_y, float angular_z)
 {
 
     float tangential_vel = angular_z * (wheels_y_distance_ / 2.0);
@@ -82,10 +78,17 @@ Kinematics::calculateRPM(float linear_x, float linear_y, float angular_z)
 Kinematics::pwm Kinematics::calculatePWM(float pwm1, float pwm2, float pwm3)
 {
     Kinematics::pwm pwm;
-    pwm.motor1 = round(float(pwm2 + pwm3) / 2) * signum(pwm1 * pwm2);
-    pwm.motor2 = round(float(pwm1 - pwm3) / 2) * signum(pwm1 * pwm2);
-    pwm.motor3 = round(float(pwm1 - pwm3) / 2);
-    pwm.motor4 = round(float(pwm2 + pwm3) / 2);
+    pwm.motor1 = pwm2 - pwm3;
+    pwm.motor1 = constrain(pwm.motor1, min_pwm_, max_pwm_);
+
+    pwm.motor2 = pwm1 + pwm3;
+    pwm.motor2 = constrain(pwm.motor2, min_pwm_, max_pwm_);
+
+    pwm.motor3 = pwm2 + pwm3;
+    pwm.motor3 = constrain(pwm.motor3, min_pwm_, max_pwm_);
+
+    pwm.motor4 = pwm1 - pwm3;
+    pwm.motor4 = constrain(pwm.motor4, min_pwm_, max_pwm_);
 
     return pwm;
 }

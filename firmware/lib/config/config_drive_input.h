@@ -5,9 +5,9 @@
 
 #define USE_GY87_IMU
 
-#define K_P 0.01
-#define K_I 0.8
-#define K_D 0
+#define K_P 5.0
+#define K_I 0.1
+#define K_D 0.01
 
 /*
 ROBOT ORIENTATION
@@ -26,7 +26,7 @@ ROBOT ORIENTATION
 #define PWM_BITS 10                     // PWM Resolution of the microcontroller
 #define PWM_FREQUENCY 20000             // PWM Frequency
 #define PWM_MAX pow(2, PWM_BITS) - 1
-#define PWM_MIN -PWM_MAX
+#define PWM_MIN (pow(2, PWM_BITS) - 1) * -1
 
 #define COUNTS_PER_REV1 600 // wheel1 encoder's no of ticks per rev
 #define COUNTS_PER_REV2 600 // wheel2 encoder's no of ticks per rev

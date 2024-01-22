@@ -177,6 +177,7 @@ void set_zero_step()
     }
     if (isSetZero[0] && isSetZero[1] && isSetZero[2] && flag_xy_state == 0)
     {
+        theta[0] = 0.0;
         positions[0] = -67000;
         positions[1] = 67000;
         positions[2] = 8000;
@@ -394,11 +395,14 @@ void destroy_entities()
 
 void renew()
 {
-    servos[0].write(90);
-    servos[1].write(90);
-    positions[0] = (long)1e8;
-    positions[1] = (long)-1e8;
-    positions[2] = (long)-1e8;
+    if (!isSetZero[0] && !isSetZero[1] && !isSetZero[2] && flag_xy_state == 0)
+    {
+        theta[0] = 90;
+        theta[1] = 90;
+        positions[0] = (long)1e8;
+        positions[1] = (long)-1e8;
+        positions[2] = (long)-1e8;
+    }
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -429,10 +433,14 @@ void sub_position_callback(const void *msgin)
 {
     const geometry_msgs__msg__Point *position_msg = (const geometry_msgs__msg__Point *)msgin;
     angular = flagGripper.getAngular(position_msg->x, position_msg->y);
-    if (position_msg->y == 999)
+    if (position_msg->y == 10)
     {
         positions[0] = ((float)-330000 / 90) * -12;
         positions[1] = ((float)330000 / 90) * -12;
+    }
+    else if (position_msg->y == 11)
+    {
+        renew();
     }
     else if ((position_msg->x != 0) || (position_msg->y != 0))
     {
@@ -446,7 +454,6 @@ void sub_position_callback(const void *msgin)
     if (position_msg->z != 0)
     {
         positions[2] = ((float)415000 / 0.455) * constrain(position_msg->z, 0, 0.455);
-        // positions[2] = position_msg->z;
     }
     debug_msg.angular.x = angular.angular_a;
     debug_msg.angular.y = angular.angular_b;
@@ -456,8 +463,11 @@ void sub_position_callback(const void *msgin)
 void sub_hand_callback(const void *msgin)
 {
     const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
-    theta[0] = (int)hand_msg->x;
-    theta[1] = (int)hand_msg->y;
+    if ((hand_msg->x != 0) || (hand_msg->y != 0))
+    {
+        theta[0] = (int)hand_msg->x;
+        theta[1] = (int)hand_msg->y;
+    }
     // if (main_ros_state == 4)
     // {
     // }

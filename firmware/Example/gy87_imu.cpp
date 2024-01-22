@@ -26,7 +26,7 @@ void setup()
     Serial.println("Initializing I2C devices...");
     accelgyro.initialize();
     barometer.initialize();
-    // mag.initialize();
+    mag.initialize();
 
     Serial.println("Testing device connections...");
     Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
@@ -34,8 +34,8 @@ void setup()
     Serial.println("Testing device connections...");
     Serial.println(barometer.testConnection() ? "BMP085 connection successful" : "BMP085 connection failed");
 
-    // Serial.println("Testing device connections...");
-    // Serial.println(mag.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
+    Serial.println("Testing device connections...");
+    Serial.println(mag.testConnection() ? "HMC5883L connection successful" : "HMC5883L connection failed");
 
     // use the code below to change accel/gyro offset values
     /*
@@ -73,9 +73,9 @@ void loop()
 
     // mag.getHeading(&mx, &my, &mz);
 
-    // float heading = atan2(my, mx);
-    // if (heading < 0)
-    //   heading += 2 * M_PI;
+    float heading = atan2(my, mx);
+    if (heading < 0)
+        heading += 2 * M_PI;
     // these methods (and a few others) are also available
     // accelgyro.getAcceleration(&ax, &ay, &az);
     // accelgyro.getRotation(&gx, &gy, &gz);
@@ -96,15 +96,15 @@ void loop()
     Serial.print("\t");
     Serial.print(pressure);
     Serial.print("\t");
-    Serial.println(altitude);
-    // Serial.print("\t");
-    // Serial.print(mx);
-    // Serial.print("\t");
-    // Serial.print(my);
-    // Serial.print("\t");
-    // Serial.print(mz);
-    // Serial.print("\t");
-    // Serial.println(heading * 180 / M_PI);
+    Serial.print(altitude);
+    Serial.print("\t");
+    Serial.print(mx);
+    Serial.print("\t");
+    Serial.print(my);
+    Serial.print("\t");
+    Serial.print(mz);
+    Serial.print("\t");
+    Serial.println(heading * 180 / M_PI);
 
     delay(100);
 }

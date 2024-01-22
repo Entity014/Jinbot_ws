@@ -39,6 +39,7 @@ setup(
             "state_node = jinbot_core.bot_state:main",
             "model_flag_node = jinbot_core.bot_flag_model:main",
             "hole_flag_node = jinbot_core.bot_flag_hole:main",
+            "color_flag_node = jinbot_core.bot_flag_color:main",
         ],
     },
 )

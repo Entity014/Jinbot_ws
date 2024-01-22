@@ -11,14 +11,15 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     channel_type = LaunchConfiguration("channel_type", default="serial")
-    serial_port = LaunchConfiguration("serial_port", default="/dev/esp32_4")
+    serial_port = LaunchConfiguration("serial_port", default="/dev/ttyUSB0")
     serial_baudrate = LaunchConfiguration(
         "serial_baudrate", default="256000"
     )  # for A3 is 256000
     frame_id = LaunchConfiguration("frame_id", default="laser")
-    inverted = LaunchConfiguration("inverted", default="false")
+    inverted = LaunchConfiguration("inverted", default="true")
     angle_compensate = LaunchConfiguration("angle_compensate", default="true")
     scan_mode = LaunchConfiguration("scan_mode", default="Sensitivity")
+    params_file = LaunchConfiguration("params_file")
 
     return LaunchDescription(
         [
@@ -57,6 +58,11 @@ def generate_launch_description():
                 default_value=scan_mode,
                 description="Specifying scan mode of lidar",
             ),
+            DeclareLaunchArgument(
+                "params_file",
+                default_value=params_file,
+                description="Full path to the ROS2 parameters file to use for sllidar node",
+            ),
             Node(
                 package="sllidar_ros2",
                 executable="sllidar_node",
@@ -70,7 +76,8 @@ def generate_launch_description():
                         "inverted": inverted,
                         "angle_compensate": angle_compensate,
                         "scan_mode": scan_mode,
-                    }
+                    },
+                    params_file,
                 ],
                 output="screen",
                 respawn=True,

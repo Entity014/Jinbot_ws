@@ -20,13 +20,6 @@
             return false;            \
         }                            \
     }
-#define RCSOFTCHECK(fn)              \
-    {                                \
-        rcl_ret_t temp_rc = fn;      \
-        if ((temp_rc != RCL_RET_OK)) \
-        {                            \
-        }                            \
-    }
 #define EXECUTE_EVERY_N_MS(MS, X)          \
     do                                     \
     {                                      \
@@ -47,7 +40,6 @@ unsigned long long time_offset = 0;
 IMU imu;
 
 //------------------------------ < Fuction Prototype > ------------------------------//
-void syncTime();
 void publishData();
 struct timespec getTime();
 //------------------------------ < Ros Fuction Prototype > --------------------------//
@@ -131,17 +123,6 @@ void loop()
 }
 
 //------------------------------ < Fuction > ----------------------------------------//
-
-void syncTime()
-{
-    // get the current time from the agent
-    unsigned long now = millis();
-    RCSOFTCHECK(rmw_uros_sync_session(10));
-    unsigned long long ros_time_ms = rmw_uros_epoch_millis();
-    // now we can find the difference between ROS time and uC time
-    time_offset = ros_time_ms - now;
-}
-
 struct timespec getTime()
 {
     struct timespec tp = {0};
@@ -164,7 +145,7 @@ void publishData()
     imu_msg.header.stamp.sec = time_stamp.tv_sec;
     imu_msg.header.stamp.nanosec = time_stamp.tv_nsec;
 
-    RCSOFTCHECK(rcl_publish(&pub_imu, &imu_msg, NULL));
+    rcl_publish(&pub_imu, &imu_msg, NULL);
 }
 
 //------------------------------ < Ros Fuction > ------------------------------------//
@@ -190,11 +171,11 @@ bool create_entities()
         timer_callback));
 
     // TODO: create publisher
-    RCCHECK(rclc_publisher_init_default(
+    RCCHECK(rclc_publisher_init_best_effort(
         &pub_imu,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
-        "imu/data"));
+        "imu/data_raw"));
 
     // TODO: create executor
     executor = rclc_executor_get_zero_initialized_executor();

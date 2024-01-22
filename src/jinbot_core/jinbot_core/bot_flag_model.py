@@ -7,7 +7,7 @@ import os
 from ultralytics import YOLO
 from supervision import Detections, BoxAnnotator
 from rclpy.node import Node
-from std_msgs.msg import Int8, Float32
+from std_msgs.msg import Int8, Float32, String
 from geometry_msgs.msg import Twist
 from rclpy import qos, Parameter
 from cv_bridge import CvBridge
@@ -27,6 +27,13 @@ class BotFlagModel(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_state
+        self.sub_main = self.create_subscription(
+            String,
+            "state/main",
+            self.sub_main_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_main
         self.sub_step_motor = self.create_subscription(
             Twist,
             "gripper/flag/state",
@@ -55,6 +62,7 @@ class BotFlagModel(Node):
 
         self.cX = 0
         self.cY = 0
+        self.state_main = "Idle"
 
         self.current_step_motor1 = 0.0
         self.current_step_motor2 = 0.0
@@ -75,11 +83,14 @@ class BotFlagModel(Node):
                 blurred = cv2.GaussianBlur(gray, (7, 7), 1)
                 _, threshold = cv2.threshold(blurred, 40, 255, cv2.THRESH_BINARY_INV)
                 self.search_contours(threshold)
-                if self.cX > 400:
-                    self.tuning += self.diff_tuning
-                elif self.cX < 350:
-                    self.tuning -= self.diff_tuning
-                # self.tuning = np.interp(self.cX, [0, 760], [50, 130])
+                if self.state_main == "Start":
+                    if self.cX > 400:
+                        self.tuning += self.diff_tuning
+                    elif self.cX < 350:
+                        self.tuning -= self.diff_tuning
+                    # self.tuning = np.interp(self.cX, [0, 760], [50, 130])
+                else:
+                    self.tuning = 90.0
                 msg_tuning.data = self.tuning
                 self.sent_tune_gripper.publish(msg_tuning)
                 # cv2.imshow("frame", self.frame)
@@ -91,6 +102,9 @@ class BotFlagModel(Node):
 
     def sub_state_callback(self, msg_in):
         self.mainros_state = msg_in.data
+
+    def sub_main_callback(self, msg_in):
+        self.state_main = msg_in.data
 
     def sub_step_motor_callback(self, msg_in):
         self.current_step_motor1 = msg_in.linear.x

@@ -3,7 +3,7 @@ import numpy as np
 
 from rclpy.node import Node
 from rclpy import qos, Parameter
-from std_msgs.msg import Int8, Bool, Float32
+from std_msgs.msg import Int8, Bool, Float32, String
 from geometry_msgs.msg import Point, Vector3, Twist
 
 
@@ -33,6 +33,27 @@ class BotFlag(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_state
+        self.sub_main = self.create_subscription(
+            String,
+            "state/main",
+            self.sub_main_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_main
+        self.sub_team = self.create_subscription(
+            String,
+            "state/team",
+            self.sub_team_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_team
+        self.sub_retry = self.create_subscription(
+            String,
+            "state/retry",
+            self.sub_retry_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_retry
         self.sub_flag_tuning = self.create_subscription(
             Float32,
             "gripper/flag/tune",
@@ -40,6 +61,20 @@ class BotFlag(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_flag_tuning
+        self.sub_flag_hole = self.create_subscription(
+            Bool,
+            "gripper/flag/hole",
+            self.sub_flag_hole_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_flag_hole
+        self.sub_flag_color = self.create_subscription(
+            String,
+            "gripper/flag/color",
+            self.sub_flag_color_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_flag_color
 
         self.sent_timer = self.create_timer(0.05, self.timer_callback)
         self.declare_parameters(
@@ -79,6 +114,12 @@ class BotFlag(Node):
 
         self.tuning = 90.0
         self.hold = False
+        self.hole = False
+        self.color = ""
+
+        self.state_main = "Idle"
+        self.state_team = "Blue"
+        self.state_retry = "None"
 
     def timer_callback(self):
         msg_pos = Point()
@@ -113,7 +154,7 @@ class BotFlag(Node):
 
     def sub_state_callback(self, msg_in):
         self.mainros_state = msg_in.data
-        self.get_logger().info(f"{self.node_state} {self.tuning}")
+        # self.get_logger().info(f"{self.node_state} {self.tuning}")
         if self.pre_node_state != self.node_state:
             if self.pre_node_state != 0:
                 self.ready_step_motor1 = False
@@ -121,43 +162,86 @@ class BotFlag(Node):
                 self.ready_step_motor3 = False
             self.pre_node_state = self.node_state
 
-        if self.mainros_state == 4:
-            if self.node_state <= 3:
-                self.theta2 = self.tuning
+        if self.state_main == "Start":
+            if self.mainros_state == 4 or self.mainros_state == 8:
+                if self.node_state <= 3:
+                    self.theta2 = self.tuning
 
-            if self.node_state == 0:
-                self.node_state = 1
-            elif self.node_state == 1 and self.ready_step_motor3:
-                self.theta1 = 1.0
-                self.position_z = 0.05
-                self.node_state = 2
-            elif self.node_state == 2 and self.ready_step_motor3:
-                self.position_y = 0.345
-                self.node_state = 3
-            elif (
-                self.node_state == 3
-                and self.ready_step_motor1
-                and self.ready_step_motor2
-            ):
-                self.theta1 = 120.0
-                self.position_z = 0.21
-                self.node_state = 4
-            elif self.node_state == 4 and self.ready_step_motor3:
-                self.position_y = 999.0
-                self.node_state = 5
-            elif (
-                self.node_state == 5
-                and self.ready_step_motor1
-                and self.ready_step_motor2
-            ):
-                self.theta1 = 105.0
-                self.theta2 = 170.0
-                self.position_z = 0.015
-                self.node_state = 6
-            elif self.node_state == 6 and self.ready_step_motor3:
-                self.theta1 = 120.0
-                self.hold = True
-                self.node_state = 7
+                if self.node_state == 0:
+                    self.node_state = 1
+                elif self.node_state == 1:
+                    self.position_z = 0.05
+                    self.node_state = 2
+                elif self.node_state == 2 and self.ready_step_motor3:
+                    if self.state_retry == "None" or self.state_retry == "First":
+                        self.position_y = 0.345
+                        self.node_state = 3
+                    else:
+                        if self.state_team == "Blue":
+                            self.position_y = 0.345
+                            self.position_x = 0.3
+                        else:
+                            self.position_y = 0.345
+                            self.position_x = -0.3
+                    self.node_state = 3
+                elif (
+                    self.node_state == 3
+                    and self.ready_step_motor1
+                    and self.ready_step_motor2
+                ):
+                    self.theta1 = 120.0
+                    self.position_z = 0.21
+                    self.node_state = 4
+                elif self.node_state == 4 and self.ready_step_motor3:
+                    self.position_y = 10.0
+                    self.node_state = 5
+                elif (
+                    self.node_state == 5
+                    and self.ready_step_motor1
+                    and self.ready_step_motor2
+                ):
+                    self.theta1 = 105.0
+                    self.theta2 = 170.0
+                    self.position_z = 0.015
+                    self.node_state = 6
+                elif self.node_state == 6 and self.ready_step_motor3:
+                    self.theta1 = 120.0
+                    self.hold = True
+                    self.node_state = 7
+            elif self.mainros_state == 6 or self.mainros_state == 9:
+                if self.node_state == 7 and self.hold:
+                    self.node_state = 0
+
+                if self.node_state == 0:
+                    self.node_state = 1
+                elif self.node_state == 1:
+                    self.position_z = 0.45
+                    self.node_state = 2
+                elif self.node_state == 2 and self.ready_step_motor3:
+                    if self.hole:
+                        self.theta1 = 1.0
+                        self.position_y = 10.0
+                    else:
+                        if self.color == "Red":
+                            self.position_y = 0.0
+                            self.position_x = 0.0
+                        elif self.color == "Green":
+                            self.position_y = 0.0
+                            self.position_x = 0.0
+                        elif self.color == "Blue":
+                            self.position_y = 0.0
+                            self.position_x = 0.0
+
+        elif self.state_main == "Reset":
+            self.theta1 = 90.0
+            self.theta2 = 90.0
+            self.node_state = 0
+            self.position_y = 11.0
+            self.color = ""
+            self.hole = False
+            self.hold = False
+        else:
+            self.position_y = 0.0
 
     def sub_step_motor_callback(self, msg_in):
         self.current_step_motor1 = msg_in.linear.x
@@ -190,6 +274,21 @@ class BotFlag(Node):
 
     def sub_flag_tuning_callback(self, msg_in):
         self.tuning = msg_in.data
+
+    def sub_flag_hole_callback(self, msg_in):
+        self.hole = msg_in.data
+
+    def sub_flag_color_callback(self, msg_in):
+        self.color = msg_in.data
+
+    def sub_main_callback(self, msg_in):
+        self.state_main = msg_in.data
+
+    def sub_team_callback(self, msg_in):
+        self.state_team = msg_in.data
+
+    def sub_retry_callback(self, msg_in):
+        self.state_retry = msg_in.data
 
 
 def main():
