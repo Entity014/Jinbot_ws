@@ -1,12 +1,12 @@
 #include <micro_ros_platformio.h>
 #include <Arduino.h>
 #include <stdio.h>
+#include <ESP32Servo.h>
+#include <AccelStepper.h>
+#include <MultiStepper.h>
 
-#include <config_drive_input.h>
-#include <kinematics.h>
-#include <pid.h>
-#include <odometry.h>
-#include <encoder.h>
+#include <config_flag.h>
+#include <gripper.h>
 
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
@@ -14,12 +14,9 @@
 #include <rclc/executor.h>
 
 #include <std_msgs/msg/int8.h>
-#include <nav_msgs/msg/odometry.h>
-#include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/vector3.h>
-
-#define ENCODER_USE_INTERRUPTS
-#define ENCODER_OPTIMIZE_INTERRUPTS
+#include <geometry_msgs/msg/point.h>
+#include <geometry_msgs/msg/twist.h>
 
 #define RCCHECK(fn)              \
   {                              \
@@ -27,13 +24,6 @@
     if ((temp_rc != RCL_RET_OK)) \
     {                            \
       return false;              \
-    }                            \
-  }
-#define RCSOFTCHECK(fn)          \
-  {                              \
-    rcl_ret_t temp_rc = fn;      \
-    if ((temp_rc != RCL_RET_OK)) \
-    {                            \
     }                            \
   }
 #define EXECUTE_EVERY_N_MS(MS, X)      \
@@ -52,42 +42,44 @@
   } while (0)
 
 //------------------------------ < ESP32 Define > -----------------------------------//
-unsigned long long time_offset = 0;
-unsigned long prev_velocity_time = 0;
-unsigned long prev_odom_update = 0;
+static uint32_t preT = 0;
+bool preTS = false;
 
-Encoder motor1_encoder(MOTOR1_ENCODER_A, MOTOR1_ENCODER_B, COUNTS_PER_REV1, MOTOR1_ENCODER_INV);
-Encoder motor2_encoder(MOTOR2_ENCODER_A, MOTOR2_ENCODER_B, COUNTS_PER_REV2, MOTOR2_ENCODER_INV);
-Encoder motor3_encoder(MOTOR3_ENCODER_A, MOTOR3_ENCODER_B, COUNTS_PER_REV3, MOTOR3_ENCODER_INV);
+bool once = true;
 
-PID motor1_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
-PID motor2_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
-PID motor3_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
-PID motor4_pid(PWM_MIN, PWM_MAX, K_P, K_I, K_D);
+int flag_xy_state = 0;
+bool isSetZero[3] = {false, false, false};
+long positions[3];
+long pre_positions[3];
 
-Kinematics kinematics(
-    Kinematics::MECANUM,
-    MOTOR_MAX_RPM,
-    MAX_RPM_RATIO,
-    MOTOR_OPERATING_VOLTAGE,
-    MOTOR_POWER_MAX_VOLTAGE,
-    WHEEL_DIAMETER,
-    LR_WHEELS_DISTANCE,
-    PWM_MIN, PWM_MAX);
+int theta[2];
+int pre_theta[2];
 
-Odometry odometry;
+int main_ros_state = 0;
+
+Servo servos[2];
+
+AccelStepper stepM1(AccelStepper::DRIVER, STEP1_PWM, STEP1_DIR);
+AccelStepper stepM2(AccelStepper::DRIVER, STEP2_PWM, STEP2_DIR);
+AccelStepper stepM3(AccelStepper::DRIVER, STEP3_PWM, STEP3_DIR);
+MultiStepper multiStep;
+
+Parallel_3dof::angular angular;
+Parallel_3dof flagGripper(LENGTH_A, LENGTH_B, LENGTH_C, LENGTH_D, LENGTH_E, LENGTH_F);
 
 //------------------------------ < Fuction Prototype > ------------------------------//
-void moveBase();
-void syncTime();
-void publishData();
-struct timespec getTime();
+
 int lim_switch(int lim_pin);
+void task_arduino_fcn(void *arg);
+void set_zero_step();
 
 //------------------------------ < Ros Fuction Prototype > --------------------------//
 
+void task_ros_fcn(void *arg);
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time);
-void sub_velocity_callback(const void *msgin);
+void sub_position_callback(const void *msgin);
+void sub_hand_callback(const void *msgin);
+void sub_main_ros_callback(const void *msgin);
 bool create_entities();
 void destroy_entities();
 void renew();
@@ -101,24 +93,20 @@ rcl_allocator_t allocator;
 rclc_executor_t executor;
 
 // ? define msg
-std_msgs__msg__Int8 start_msg;
-std_msgs__msg__Int8 team_msg;
-std_msgs__msg__Int8 retry_msg;
-nav_msgs__msg__Odometry odom_msg;
-geometry_msgs__msg__Twist pwm_msg;
+std_msgs__msg__Int8 main_ros_msg;
+geometry_msgs__msg__Twist step_msg;
 geometry_msgs__msg__Twist debug_msg;
-geometry_msgs__msg__Twist velocity_msg;
+geometry_msgs__msg__Vector3 hand_msg;
+geometry_msgs__msg__Point position_msg;
 
 // ? define publisher
 rcl_publisher_t pub_debug;
-rcl_publisher_t pub_odom;
-rcl_publisher_t pub_pwm;
-rcl_publisher_t pub_start;
-rcl_publisher_t pub_team;
-rcl_publisher_t pub_retry;
+rcl_publisher_t pub_step;
 
 // ? define subscriber
-rcl_subscription_t sub_velocity;
+rcl_subscription_t sub_position;
+rcl_subscription_t sub_hand;
+rcl_subscription_t sub_main_ros;
 
 rcl_init_options_t init_options;
 
@@ -136,146 +124,197 @@ enum states
 
 void setup()
 {
-  Serial.begin(115200);
-  set_microros_serial_transports(Serial);
-  pinMode(START_BUTTON, INPUT_PULLUP);
-  pinMode(TEAM_BUTTON, INPUT_PULLUP);
-  pinMode(RETRY_BUTTON, INPUT_PULLUP);
+  xTaskCreatePinnedToCore(
+      task_arduino_fcn,   /* Task function. */
+      "Arduino Task",     /* String with name of task. */
+      TASK_ARDUINO_BYTES, /* Stack size in bytes. */
+      NULL,               /* Parameter passed as input of the task */
+      TASK_ARDUINO_PRIO,  /* Priority of the task. */
+      NULL,               /* Task handle. */
+      TASK_ARDUINO_CORE);
+
+  xTaskCreatePinnedToCore(
+      task_ros_fcn,        /* Task function. */
+      "Ros Task",          /* String with name of task. */
+      TASK_MICROROS_BYTES, /* Stack size in bytes. */
+      NULL,                /* Parameter passed as input of the task */
+      TASK_MICROROS_PRIO,  /* Priority of the task. */
+      NULL,                /* Task handle. */
+      TASK_MICROROS_PRIO);
 }
 
 void loop()
 {
-  switch (state)
-  {
-  case WAITING_AGENT:
-    EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
-    break;
-  case AGENT_AVAILABLE:
-    state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-    if (state == WAITING_AGENT)
-    {
-      destroy_entities();
-    };
-    break;
-  case AGENT_CONNECTED:
-    EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-    if (state == AGENT_CONNECTED)
-    {
-      rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-    }
-    break;
-  case AGENT_DISCONNECTED:
-    destroy_entities();
-    state = WAITING_AGENT;
-    break;
-  default:
-    break;
-  }
-
-  if (state == AGENT_CONNECTED)
-  {
-  }
-  else
-  {
-    renew();
-  }
 }
 
 //------------------------------ < Fuction > ----------------------------------------//
+
 int lim_switch(int lim_pin)
 {
   return !digitalRead(lim_pin);
 }
 
-void moveBase()
+void set_zero_step()
 {
-  if (((millis() - prev_velocity_time) >= 200))
+  if (lim_switch(LIMIT2) == HIGH && !isSetZero[0])
   {
-    velocity_msg.linear.x = 0.0;
-    velocity_msg.linear.y = 0.0;
-    velocity_msg.angular.z = 0.0;
+    stepM1.setSpeed(0);
+    stepM1.setCurrentPosition(0);
+    positions[0] = 0;
+    isSetZero[0] = true;
   }
-
-  Kinematics::rpm req_rpm = kinematics.getRPM(
-      velocity_msg.linear.x,
-      velocity_msg.linear.y,
-      velocity_msg.angular.z);
-
-  float current_rpm1 = motor2_encoder.getRPM();
-  float current_rpm2 = motor1_encoder.getRPM();
-  float current_rpm3 = motor3_encoder.getRPM();
-  debug_msg.linear.x = current_rpm1;
-  debug_msg.linear.y = current_rpm2;
-  debug_msg.linear.z = current_rpm3;
-  debug_msg.angular.x = req_rpm.motor1;
-  debug_msg.angular.y = req_rpm.motor2;
-  debug_msg.angular.z = req_rpm.motor3;
-
-  Kinematics::pwm motor_pwm = kinematics.getPWM(motor1_pid.compute(req_rpm.motor1, current_rpm1), motor2_pid.compute(req_rpm.motor2, current_rpm2), motor3_pid.compute(req_rpm.motor3, current_rpm3));
-  pwm_msg.linear.x = motor_pwm.motor1;
-  pwm_msg.linear.y = motor_pwm.motor2;
-  pwm_msg.linear.z = motor_pwm.motor3;
-  pwm_msg.angular.x = motor_pwm.motor4;
-
-  Kinematics::velocities current_vel = kinematics.getVelocities(
-      current_rpm1,
-      current_rpm2,
-      current_rpm3);
-
-  unsigned long now = millis();
-  float vel_dt = (now - prev_odom_update) / 1000.0;
-  prev_odom_update = now;
-  odometry.update(
-      vel_dt,
-      current_vel.linear_x,
-      current_vel.linear_y,
-      current_vel.angular_z);
+  if (lim_switch(LIMIT1) == HIGH && !isSetZero[1])
+  {
+    stepM2.setSpeed(0);
+    stepM2.setCurrentPosition(0);
+    positions[1] = 0;
+    isSetZero[1] = true;
+  }
+  if (lim_switch(LIMIT3) == HIGH && !isSetZero[2])
+  {
+    stepM3.setSpeed(0);
+    stepM3.setCurrentPosition(0);
+    positions[2] = 0;
+    isSetZero[2] = true;
+  }
+  if (isSetZero[0] && isSetZero[1] && isSetZero[2] && flag_xy_state == 0)
+  {
+    theta[0] = 0.0;
+    positions[0] = -67000;
+    positions[1] = 67000;
+    positions[2] = 8000;
+    flag_xy_state = 1;
+  }
 }
 
-void syncTime()
+void task_arduino_fcn(void *arg)
 {
-  // get the current time from the agent
-  unsigned long now = millis();
-  RCSOFTCHECK(rmw_uros_sync_session(10));
-  unsigned long long ros_time_ms = rmw_uros_epoch_millis();
-  // now we can find the difference between ROS time and uC time
-  time_offset = ros_time_ms - now;
-}
+  pinMode(LIMIT1, INPUT_PULLUP);
+  pinMode(LIMIT2, INPUT_PULLUP);
+  pinMode(LIMIT3, INPUT_PULLUP);
 
-struct timespec getTime()
-{
-  struct timespec tp = {0};
-  // add time difference between uC time and ROS time to
-  // synchronize time with ROS
-  unsigned long long now = millis() + time_offset;
-  tp.tv_sec = now / 1000;
-  tp.tv_nsec = (now % 1000) * 1000000;
+  stepM1.setMaxSpeed(STEP1_SPEED);
+  stepM2.setMaxSpeed(STEP2_SPEED);
+  stepM3.setMaxSpeed(STEP3_SPEED);
+  stepM1.setAcceleration(STEP1_SPEED * 1.25);
+  stepM2.setAcceleration(STEP2_SPEED * 1.25);
+  stepM3.setAcceleration(STEP3_SPEED * 1.25);
 
-  return tp;
-}
+  multiStep.addStepper(stepM1);
+  multiStep.addStepper(stepM2);
+  multiStep.addStepper(stepM3);
 
-void publishData()
-{
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+  servos[0].setPeriodHertz(50);
+  servos[1].setPeriodHertz(50);
 
-  odom_msg = odometry.getData();
+  servos[0].attach(SERVO1, 1000, 2000);
+  servos[1].attach(SERVO2, 1000, 2000);
+  while (true)
+  {
+    if (pre_theta[0] != theta[0])
+    {
+      servos[0].write(theta[0]);
+      pre_theta[0] = theta[0];
+    }
+    if (pre_theta[1] != theta[1])
+    {
+      servos[1].write(theta[1]);
+      pre_theta[1] = theta[1];
+    }
+    set_zero_step();
 
-  start_msg.data = lim_switch(START_BUTTON);
-  team_msg.data = lim_switch(TEAM_BUTTON);
-  retry_msg.data = lim_switch(RETRY_BUTTON);
-  struct timespec time_stamp = getTime();
+    if ((pre_positions[0] != positions[0]) || (pre_positions[1] != positions[1]) || (pre_positions[2] != positions[2]))
+    {
+      pre_positions[0] = positions[0];
+      pre_positions[1] = positions[1];
+      pre_positions[2] = positions[2];
+      multiStep.moveTo(positions);
+    }
+    multiStep.run();
 
-  odom_msg.header.stamp.sec = time_stamp.tv_sec;
-  odom_msg.header.stamp.nanosec = time_stamp.tv_nsec;
-
-  RCSOFTCHECK(rcl_publish(&pub_pwm, &pwm_msg, NULL));
-  RCSOFTCHECK(rcl_publish(&pub_team, &team_msg, NULL));
-  RCSOFTCHECK(rcl_publish(&pub_odom, &odom_msg, NULL));
-  RCSOFTCHECK(rcl_publish(&pub_start, &start_msg, NULL));
-  RCSOFTCHECK(rcl_publish(&pub_debug, &debug_msg, NULL));
-  RCSOFTCHECK(rcl_publish(&pub_retry, &retry_msg, NULL));
+    if (flag_xy_state == 1)
+    {
+      if (stepM1.distanceToGo() == 0)
+      {
+        stepM1.setCurrentPosition(0);
+        positions[0] = 0;
+        isSetZero[0] = false;
+      }
+      if (stepM2.distanceToGo() == 0)
+      {
+        stepM2.setCurrentPosition(0);
+        positions[1] = 0;
+        isSetZero[1] = false;
+      }
+      if (stepM3.distanceToGo() == 0)
+      {
+        isSetZero[2] = false;
+      }
+      if (!isSetZero[0] && !isSetZero[1] && !isSetZero[2])
+      {
+        flag_xy_state = 0;
+      }
+    }
+  }
 }
 
 //------------------------------ < Ros Fuction > ------------------------------------//
+
+void task_ros_fcn(void *arg)
+{
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
+  pinMode(LED1_PIN, OUTPUT);
+  pinMode(LED2_PIN, OUTPUT);
+
+  digitalWrite(LED1_PIN, LOW);
+  digitalWrite(LED2_PIN, LOW);
+  while (true)
+  {
+    switch (state)
+    {
+    case WAITING_AGENT:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+      break;
+    case AGENT_AVAILABLE:
+      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+      if (state == WAITING_AGENT)
+      {
+        destroy_entities();
+      };
+      break;
+    case AGENT_CONNECTED:
+      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
+      if (state == AGENT_CONNECTED)
+      {
+        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+      }
+      break;
+    case AGENT_DISCONNECTED:
+      destroy_entities();
+      state = WAITING_AGENT;
+      break;
+    default:
+      break;
+    }
+
+    if (state == AGENT_CONNECTED)
+    {
+      digitalWrite(LED1_PIN, HIGH);
+      digitalWrite(LED2_PIN, LOW);
+    }
+    else
+    {
+      digitalWrite(LED1_PIN, LOW);
+      digitalWrite(LED2_PIN, HIGH);
+    }
+  }
+}
+
 bool create_entities()
 {
   allocator = rcl_get_default_allocator();
@@ -302,44 +341,36 @@ bool create_entities()
       &pub_debug,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-      "debug/drive/input"));
-  RCCHECK(rclc_publisher_init_default(
-      &pub_pwm,
+      "debug/flag"));
+  RCCHECK(rclc_publisher_init_best_effort(
+      &pub_step,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-      "drive/pwm"));
-  RCCHECK(rclc_publisher_init_default(
-      &pub_odom,
-      &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
-      "odom/unfiltered"));
-  RCCHECK(rclc_publisher_init_default(
-      &pub_start,
-      &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
-      "button/start"));
-  RCCHECK(rclc_publisher_init_default(
-      &pub_team,
-      &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
-      "button/team"));
-  RCCHECK(rclc_publisher_init_default(
-      &pub_retry,
-      &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
-      "button/retry"));
+      "gripper/flag/state"));
 
   // TODO: create subscriber
   RCCHECK(rclc_subscription_init_default(
-      &sub_velocity,
+      &sub_position,
       &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-      "cmd_vel"));
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Point),
+      "gripper/flag/pos"));
+  RCCHECK(rclc_subscription_init_default(
+      &sub_hand,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3),
+      "gripper/flag/hand"));
+  RCCHECK(rclc_subscription_init_default(
+      &sub_main_ros,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int8),
+      "state/main_ros"));
 
   // TODO: create executor
   executor = rclc_executor_get_zero_initialized_executor();
-  RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
-  RCCHECK(rclc_executor_add_subscription(&executor, &sub_velocity, &velocity_msg, &sub_velocity_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sub_position, &position_msg, &sub_position_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sub_hand, &hand_msg, &sub_hand_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sub_main_ros, &main_ros_msg, &sub_main_ros_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_timer(&executor, &timer));
 
   return true;
@@ -350,13 +381,11 @@ void destroy_entities()
   rmw_context_t *rmw_context = rcl_context_get_rmw_context(&support.context);
   (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
-  rcl_publisher_fini(&pub_pwm, &node);
-  rcl_publisher_fini(&pub_team, &node);
-  rcl_publisher_fini(&pub_odom, &node);
-  rcl_publisher_fini(&pub_start, &node);
-  rcl_publisher_fini(&pub_retry, &node);
   rcl_publisher_fini(&pub_debug, &node);
-  rcl_subscription_fini(&sub_velocity, &node);
+  rcl_publisher_fini(&pub_step, &node);
+  rcl_subscription_fini(&sub_position, &node);
+  rcl_subscription_fini(&sub_hand, &node);
+  rcl_subscription_fini(&sub_main_ros, &node);
   rcl_timer_fini(&timer);
   rclc_executor_fini(&executor);
   rcl_node_fini(&node);
@@ -365,6 +394,14 @@ void destroy_entities()
 
 void renew()
 {
+  if (!isSetZero[0] && !isSetZero[1] && !isSetZero[2] && flag_xy_state == 0)
+  {
+    theta[0] = 90;
+    theta[1] = 90;
+    positions[0] = (long)1e8;
+    positions[1] = (long)-1e8;
+    positions[2] = (long)-1e8;
+  }
 }
 
 //------------------------------ < Publisher Fuction > ------------------------------//
@@ -374,14 +411,75 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time)
   (void)last_call_time;
   if (timer != NULL)
   {
-    moveBase();
-    publishData();
+    debug_msg.linear.x = stepM1.speed();
+    debug_msg.linear.y = stepM2.speed();
+    debug_msg.linear.z = stepM3.speed();
+
+    step_msg.linear.x = stepM1.currentPosition();
+    step_msg.linear.y = stepM2.currentPosition();
+    step_msg.linear.z = stepM3.currentPosition();
+    step_msg.angular.x = stepM1.distanceToGo();
+    step_msg.angular.y = stepM2.distanceToGo();
+    step_msg.angular.z = stepM3.distanceToGo();
+    rcl_publish(&pub_debug, &debug_msg, NULL);
+    rcl_publish(&pub_step, &step_msg, NULL);
   }
 }
 
 //------------------------------ < Subscriber Fuction > -----------------------------//
 
-void sub_velocity_callback(const void *msgin)
+void sub_position_callback(const void *msgin)
 {
-  prev_velocity_time = millis();
+  const geometry_msgs__msg__Point *position_msg = (const geometry_msgs__msg__Point *)msgin;
+  angular = flagGripper.getAngular(position_msg->x, position_msg->y);
+  if (position_msg->y == 10)
+  {
+    positions[0] = ((float)-330000 / 90) * -12;
+    positions[1] = ((float)330000 / 90) * -12;
+  }
+  else if (position_msg->y == 11)
+  {
+    if (once)
+    {
+      renew();
+
+      once = false;
+    }
+  }
+  else if ((position_msg->x != 0) || (position_msg->y != 0))
+  {
+    positions[0] = ((float)-330000 / 90) * constrain(angular.angular_a, -12, 120);
+    positions[1] = ((float)330000 / 90) * constrain(angular.angular_b, -12, 120);
+    // if (main_ros_state == 6)
+    // {
+    //   theta[1] = (int)constrain(angular.angular_c, 0, 180);
+    // }
+  }
+  if (position_msg->z != 0)
+  {
+    positions[2] = ((float)415000 / 0.455) * constrain(position_msg->z, 0, 0.455);
+    once = true;
+  }
+  debug_msg.angular.x = angular.angular_a;
+  debug_msg.angular.y = angular.angular_b;
+  debug_msg.angular.z = angular.angular_c;
+}
+
+void sub_hand_callback(const void *msgin)
+{
+  const geometry_msgs__msg__Vector3 *hand_msg = (const geometry_msgs__msg__Vector3 *)msgin;
+  if ((hand_msg->x != 0) || (hand_msg->y != 0))
+  {
+    theta[0] = (int)hand_msg->x;
+    theta[1] = (int)hand_msg->y;
+  }
+  // if (main_ros_state == 4)
+  // {
+  // }
+}
+
+void sub_main_ros_callback(const void *msgin)
+{
+  const std_msgs__msg__Int8 *main_ros_msg = (const std_msgs__msg__Int8 *)msgin;
+  main_ros_state = main_ros_msg->data;
 }

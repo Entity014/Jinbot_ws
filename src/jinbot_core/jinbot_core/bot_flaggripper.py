@@ -163,7 +163,9 @@ class BotFlag(Node):
             self.pre_node_state = self.node_state
 
         if self.state_main == "Start":
-            if self.mainros_state == 4 or self.mainros_state == 8:
+            if self.mainros_state == 1:
+                self.position_y = 11.0
+            elif self.mainros_state == 4 or self.mainros_state == 8:
                 if self.node_state <= 3:
                     self.theta2 = self.tuning
 
@@ -223,13 +225,13 @@ class BotFlag(Node):
                         self.position_y = 10.0
                     else:
                         if self.color == "Red":
-                            self.position_y = 0.0
-                            self.position_x = 0.0
-                        elif self.color == "Green":
-                            self.position_y = 0.0
+                            self.position_y = 0.3
                             self.position_x = 0.0
                         elif self.color == "Blue":
-                            self.position_y = 0.0
+                            self.position_y = 0.4
+                            self.position_x = 0.0
+                        elif self.color == "Green":
+                            self.position_y = 0.5
                             self.position_x = 0.0
 
         elif self.state_main == "Reset":
@@ -289,6 +291,9 @@ class BotFlag(Node):
 
     def sub_retry_callback(self, msg_in):
         self.state_retry = msg_in.data
+
+    def sub_state_callback(self, msg_in):
+        self.mainros_state = msg_in.data
 
 
 def main():

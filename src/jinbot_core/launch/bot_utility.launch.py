@@ -25,7 +25,6 @@ def generate_launch_description():
         executable="model_flag_node",
         parameters=[function_config_path],
     )
-    node_hole_flag = Node(package="jinbot_core", executable="hole_flag_node")
     node_color_flag = Node(package="jinbot_core", executable="color_flag_node")
     node_joy = Node(package="joy", executable="joy_node")
     node_joyd = Node(package="jinbot_core", executable="joy_node")
@@ -34,14 +33,17 @@ def generate_launch_description():
         executable="drive_node",
         parameters=[function_config_path],
     )
+    node_slope = Node(package="jinbot_core", executable="slope_node")
+    node_nav2 = Node(package="jinbot_core", executable="navigation_node")
 
     # ld.add_action(node_joy)
     # ld.add_action(node_joyd)
-    # ld.add_action(node_drive)
-    ld.add_action(node_state)
-    ld.add_action(node_flag)
+    ld.add_action(node_drive)
+    # ld.add_action(node_slope)
+    # ld.add_action(node_state)
+    # ld.add_action(node_nav2)
+    # ld.add_action(node_flag)
     # ld.add_action(node_model_flag)
-    # ld.add_action(node_hole_flag)
     # ld.add_action(node_color_flag)
 
     return ld

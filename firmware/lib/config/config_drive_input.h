@@ -6,8 +6,8 @@
 #define USE_GY87_IMU
 
 #define K_P 5.0
-#define K_I 0.1
-#define K_D 0.01
+#define K_I 0.5
+#define K_D 0.00001
 
 /*
 ROBOT ORIENTATION

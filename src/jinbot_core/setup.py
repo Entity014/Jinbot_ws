@@ -38,8 +38,9 @@ setup(
             "joy_node = jinbot_core.joy_drive:main",
             "state_node = jinbot_core.bot_state:main",
             "model_flag_node = jinbot_core.bot_flag_model:main",
-            "hole_flag_node = jinbot_core.bot_flag_hole:main",
             "color_flag_node = jinbot_core.bot_flag_color:main",
+            "slope_node = jinbot_core.bot_slope:main",
+            "navigation_node = jinbot_core.bot_nav2:main",
         ],
     },
 )

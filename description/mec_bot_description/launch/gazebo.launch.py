@@ -58,14 +58,18 @@ def generate_launch_description():
                     "-entity",
                     "mec_bot",
                     "-x",
-                    "4.3",
+                    "4.1",
                     "-y",
-                    "-4.0",
+                    "-4.1",
                     "-z",
                     "0.0",
                     "-Y",
                     "-3.140",
                 ],
+                # 4.1 -4.1 0.0 -3.140 Blue spwan
+                # 1.32 -1.8 1.0 1.570 Blue retry
+                # -4.1 -4.1 0.0 0.0 Green spwan
+                # -1.32 -1.8 0.0 1.570 Green spwan
             ),
             Node(
                 package="mec_bot_description",

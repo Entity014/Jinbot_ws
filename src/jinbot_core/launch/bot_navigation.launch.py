@@ -7,7 +7,7 @@ from launch.actions import IncludeLaunchDescription, RegisterEventHandler
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
-MAP_NAME = "jinpao_blue2"
+MAP_NAME = "jinpao_green2"
 
 
 def generate_launch_description():
@@ -29,7 +29,13 @@ def generate_launch_description():
     nav2_launch_path = PathJoinSubstitution(
         [FindPackageShare("nav2_bringup"), "launch", "bringup_launch.py"]
     )
+    description_launch_path = PathJoinSubstitution(
+        [FindPackageShare("jinbot_core"), "launch", "bot_description.launch.py"]
+    )
 
+    launch_description = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(description_launch_path)
+    )
     launch_nav = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(nav2_launch_path),
         launch_arguments={
@@ -55,6 +61,7 @@ def generate_launch_description():
         arguments=["-d", rviz_config_path],
     )
 
+    ld.add_action(launch_description)
     ld.add_action(node_localization)
     ld.add_action(launch_nav)
     ld.add_action(node_rviz)

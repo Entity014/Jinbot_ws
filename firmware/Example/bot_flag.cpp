@@ -45,9 +45,11 @@
 static uint32_t preT = 0;
 bool preTS = false;
 
+bool once = true;
+
 int flag_xy_state = 0;
 bool isSetZero[3] = {false, false, false};
-long positions[3] = {(long)1e10, (long)-1e10, (long)-1e10};
+long positions[3];
 long pre_positions[3];
 
 int theta[2];
@@ -211,8 +213,6 @@ void task_arduino_fcn(void *arg)
 
     servos[0].attach(SERVO1, 1000, 2000);
     servos[1].attach(SERVO2, 1000, 2000);
-    servos[0].write(90);
-    servos[1].write(90);
     while (true)
     {
         if (pre_theta[0] != theta[0])
@@ -311,7 +311,6 @@ void task_ros_fcn(void *arg)
         {
             digitalWrite(LED1_PIN, LOW);
             digitalWrite(LED2_PIN, HIGH);
-            renew();
         }
     }
 }
@@ -440,7 +439,12 @@ void sub_position_callback(const void *msgin)
     }
     else if (position_msg->y == 11)
     {
-        renew();
+        if (once)
+        {
+            renew();
+
+            once = false;
+        }
     }
     else if ((position_msg->x != 0) || (position_msg->y != 0))
     {
@@ -454,6 +458,7 @@ void sub_position_callback(const void *msgin)
     if (position_msg->z != 0)
     {
         positions[2] = ((float)415000 / 0.455) * constrain(position_msg->z, 0, 0.455);
+        once = true;
     }
     debug_msg.angular.x = angular.angular_a;
     debug_msg.angular.y = angular.angular_b;

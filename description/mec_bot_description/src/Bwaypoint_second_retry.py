@@ -17,6 +17,8 @@ from geometry_msgs.msg import PoseStamped
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 import rclpy
 from rclpy.duration import Duration
+import math
+from tf_transformations import quaternion_from_euler
 
 """
 Basic navigation demo to go to poses.
@@ -32,10 +34,10 @@ def main():
     initial_pose = PoseStamped()
     initial_pose.header.frame_id = "map"
     initial_pose.header.stamp = navigator.get_clock().now().to_msg()
-    initial_pose.pose.position.x = -0.27
-    initial_pose.pose.position.y = 0.08
-    initial_pose.pose.orientation.z = -1.0
-    initial_pose.pose.orientation.w = 0.05
+    initial_pose.pose.position.x = -3.3
+    initial_pose.pose.position.y = 2.5
+    initial_pose.pose.orientation.z = 0.725
+    initial_pose.pose.orientation.w = 0.688
     navigator.setInitialPose(initial_pose)
 
     # Activate navigation, if not autostarted. This should be called after setInitialPose()
@@ -59,75 +61,39 @@ def main():
     goal_pose1 = PoseStamped()
     goal_pose1.header.frame_id = "map"
     goal_pose1.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose1.pose.position.x = -2.1
-    goal_pose1.pose.position.y = 0.75
-    goal_pose1.pose.orientation.z = 1.0
-    goal_pose1.pose.orientation.w = -0.1
+    goal_pose1.pose.position.x = -4.3
+    goal_pose1.pose.position.y = 5.8
+    (
+        goal_pose1.pose.orientation.x,
+        goal_pose1.pose.orientation.y,
+        goal_pose1.pose.orientation.z,
+        goal_pose1.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(100))
     goal_poses.append(goal_pose1)
     goal_pose2 = PoseStamped()
     goal_pose2.header.frame_id = "map"
     goal_pose2.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose2.pose.position.x = -2.1
-    goal_pose2.pose.position.y = 3.7
-    goal_pose2.pose.orientation.z = 1.0
-    goal_pose2.pose.orientation.w = -0.1
+    goal_pose2.pose.position.x = -3.6
+    goal_pose2.pose.position.y = 5.5
+    (
+        goal_pose2.pose.orientation.x,
+        goal_pose2.pose.orientation.y,
+        goal_pose2.pose.orientation.z,
+        goal_pose2.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(-10))
     goal_poses.append(goal_pose2)
     goal_pose3 = PoseStamped()
     goal_pose3.header.frame_id = "map"
     goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose3.pose.position.x = -1.9
-    goal_pose3.pose.position.y = 1.9
-    goal_pose3.pose.orientation.z = 0.993
-    goal_pose3.pose.orientation.w = 0.122
+    goal_pose3.pose.position.x = -3.5
+    goal_pose3.pose.position.y = 1.0
+    (
+        goal_pose3.pose.orientation.x,
+        goal_pose3.pose.orientation.y,
+        goal_pose3.pose.orientation.z,
+        goal_pose3.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(-10))
     goal_poses.append(goal_pose3)
-    goal_pose4 = PoseStamped()
-    goal_pose4.header.frame_id = "map"
-    goal_pose4.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose4.pose.position.x = -0.27
-    goal_pose4.pose.position.y = 1.2
-    goal_pose4.pose.orientation.z = 0.643
-    goal_pose4.pose.orientation.w = 0.766
-    goal_poses.append(goal_pose4)
-    goal_pose5 = PoseStamped()
-    goal_pose5.header.frame_id = "map"
-    goal_pose5.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose5.pose.position.x = -0.5
-    goal_pose5.pose.position.y = 3.0
-    goal_pose5.pose.orientation.z = 0.643
-    goal_pose5.pose.orientation.w = 0.766
-    goal_poses.append(goal_pose5)
-    goal_pose6 = PoseStamped()
-    goal_pose6.header.frame_id = "map"
-    goal_pose6.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose6.pose.position.x = -1.0
-    goal_pose6.pose.position.y = 6.2
-    goal_pose6.pose.orientation.z = 0.643
-    goal_pose6.pose.orientation.w = 0.766
-    goal_poses.append(goal_pose6)
-    goal_pose7 = PoseStamped()
-    goal_pose7.header.frame_id = "map"
-    goal_pose7.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose7.pose.position.x = -1.1
-    goal_pose7.pose.position.y = 6.2
-    goal_pose7.pose.orientation.z = -0.1
-    goal_pose7.pose.orientation.w = 1.0
-    goal_poses.append(goal_pose7)
-    goal_pose8 = PoseStamped()
-    goal_pose8.header.frame_id = "map"
-    goal_pose8.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose8.pose.position.x = -3.8
-    goal_pose8.pose.position.y = 5.0
-    goal_pose8.pose.orientation.z = -0.1
-    goal_pose8.pose.orientation.w = 1.0
-    goal_poses.append(goal_pose8)
-    goal_pose9 = PoseStamped()
-    goal_pose9.header.frame_id = "map"
-    goal_pose9.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose9.pose.position.x = -3.8
-    goal_pose9.pose.position.y = 0.9
-    goal_pose9.pose.orientation.z = 0.174
-    goal_pose9.pose.orientation.w = 0.985
-    goal_poses.append(goal_pose9)
 
     # sanity check a valid path exists
     # path = navigator.getPath(initial_pose, goal_pose1)
@@ -183,7 +149,8 @@ def main():
     else:
         print("Goal has an invalid return status!")
 
-    navigator.lifecycleShutdown()
+    # navigator.lifecycleShutdown()
+    # navigator.lifecycleStartup()
 
     exit(0)
 

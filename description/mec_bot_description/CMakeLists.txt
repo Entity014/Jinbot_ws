@@ -27,7 +27,7 @@ install(
 )
 
 install(PROGRAMS
-  src/command_timeout.py src/example_waypoint_follower.py
+  src/command_timeout.py src/Bwaypoint_first.py src/Bwaypoint_second.py src/Bwaypoint_second_retry.py src/Rwaypoint_first.py src/Rwaypoint_second.py src/Rwaypoint_second_retry.py
   # src/example_waypoint_follower.py
   DESTINATION lib/${PROJECT_NAME}
 )
