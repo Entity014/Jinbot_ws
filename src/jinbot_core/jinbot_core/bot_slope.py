@@ -31,15 +31,15 @@ class BotSlope(Node):
 
     def slope_callback(self):
         msg = Bool()
-        roll = -math.degrees(self.pitch)
-        if roll >= 4:  # 8
+        roll = -math.degrees(self.roll)
+        if roll >= 8:  # 8
             self.isSlope = True
         else:
             self.isSlope = False
         msg.data = self.isSlope
-        # self.get_logger().info(
-        #     f"{math.degrees(-self.roll)} {math.degrees(-self.pitch)} {math.degrees(-self.yaw)}"
-        # )
+        self.get_logger().info(
+            f"{math.degrees(-self.roll)} {math.degrees(-self.pitch)} {math.degrees(-self.yaw)}"
+        )
         self.sent_slope.publish(msg)
 
     def sub_imu_callback(self, msg_in):

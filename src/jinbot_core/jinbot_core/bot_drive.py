@@ -61,24 +61,24 @@ class BotDrive(Node):
         self.rotation_z = (
             self.get_parameter("rotation.z").get_parameter_value().double_value
         )
-        # if self.self_drive_state == 0:
-        #     msg.linear.x = self.speed_x
-        #     self.sent_drive.publish(msg)
-        # elif self.self_drive_state == 1:
-        #     msg.linear.x = 0.0
-        #     self.sent_drive.publish(msg)
-        #     self.self_drive_state = 2
-        # if not self.start_slope:
-        #     self.speed_x = 0.5
-        # if self.slope:
-        #     self.speed_x = 0.5
-        #     self.start_slope = True
-        # elif not self.slope and self.start_slope:
-        #     self.self_drive_state = 1
-        # self.get_logger().info(
-        #     f"{self.self_drive_state} {self.start_slope} {self.slope}"
-        # )
-        msg.linear.x = self.speed_x
+        if self.self_drive_state == 0:
+            msg.linear.x = self.speed_x
+            self.sent_drive.publish(msg)
+        elif self.self_drive_state == 1:
+            msg.linear.x = 0.0
+            self.sent_drive.publish(msg)
+            self.self_drive_state = 2
+        if not self.start_slope:
+            self.speed_x = 0.5
+        if self.slope:
+            self.speed_x = 0.5
+            self.start_slope = True
+        elif not self.slope and self.start_slope:
+            self.self_drive_state = 1
+        self.get_logger().info(
+            f"{self.self_drive_state} {self.start_slope} {self.slope}"
+        )
+        # msg.linear.x = self.speed_x
         msg.linear.y = self.speed_y
         msg.linear.z = self.speed_z
         msg.angular.x = self.rotation_x

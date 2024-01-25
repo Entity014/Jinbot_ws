@@ -90,9 +90,9 @@ class BotNav2(Node):
 
     def timer_callback(self):
         msg_velocity = Twist()
-        self.get_logger().info(
-            f"{self.state_main} {self.state_main_ros} {self.self_drive_state} {self.pre_state_main_ros}"
-        )
+        # self.get_logger().info(
+        #     f"{self.state_main} {self.state_main_ros} {self.self_drive_state} {self.pre_state_main_ros}"
+        # )
         if self.state_main == "Start":
             if self.state_team == "Blue":  # ? BLUE
                 if self.pre_state_main_ros != self.state_main_ros:
@@ -117,6 +117,7 @@ class BotNav2(Node):
                     elif self.state_main_ros == 8:
                         self.waypoint([-3.6, 5.5, -10], [-3.5, 1.0, -10])
                     self.pre_state_main_ros = self.state_main_ros
+
                 if self.state_main_ros != 5:
                     self.check_goal()
                 else:
@@ -137,19 +138,34 @@ class BotNav2(Node):
                         self.self_drive_state = 1
                 if self.self_drive_state == 2:
                     self.check_goal()
-            else:  # ! RED
-                if self.state_main_ros == 1:
-                    self.navigator.changeMap(self.path_green_map)
-                    self.setip(-5.1, 3.0, -10)
-                    self.goto(-3.5, 3.15, -18)
 
-                elif self.state_main_ros == 2:
-                    self.goto(-3.05, 6.05, -18)
-                elif self.state_main_ros == 3:
-                    self.goto(-3.6, 3.8, -170)
-                elif self.state_main_ros == 4:
-                    self.goto(-5.2, 3.7, 70)
-                elif self.state_main_ros == 5:
+            else:  # ! RED
+                if self.pre_state_main_ros != self.state_main_ros:
+                    if self.state_main_ros == 1:
+                        self.navigator.changeMap(self.path_green_map)
+                        self.setip(-5.1, 3.0, -10)
+                        time.sleep(2.0)
+                        self.goto(-3.5, 3.15, -18)
+                    elif self.state_main_ros == 2:
+                        self.goto(-3.05, 6.05, -18)
+                    elif self.state_main_ros == 3:
+                        self.goto(-3.6, 3.8, -170)
+                    elif self.state_main_ros == 4:
+                        self.goto(-5.2, 3.7, 70)
+                    elif self.state_main_ros == 5:
+                        if self.self_drive_state == 2:
+                            self.setip(-4.2, 7.7, 80)
+                            self.waypoint([[-0.9, 7.8, 180], [-2.0, 3.3, 180]])
+                    elif self.state_main_ros == 7:
+                        self.setip(-1.9, 4.7, 80)
+                        self.goto(-0.5, 8.0, 80)
+                    elif self.state_main_ros == 8:
+                        self.waypoint([[-0.9, 7.8, 180], [-2.0, 3.3, 180]])
+                    self.pre_state_main_ros = self.state_main_ros
+
+                if self.state_main_ros != 5:
+                    self.check_goal()
+                else:
                     if self.self_drive_state == 0:
                         msg_velocity.linear.x = self.speed_x
                         self.sent_velocity.publish(msg_velocity)
@@ -157,6 +173,7 @@ class BotNav2(Node):
                         msg_velocity.linear.x = 0.0
                         self.sent_velocity.publish(msg_velocity)
                         self.self_drive_state = 2
+                        self.pre_state_main_ros = 0
                     if not self.start_slope:
                         self.speed_x = 0.5
                     if self.slope:
@@ -164,15 +181,8 @@ class BotNav2(Node):
                         self.start_slope = True
                     elif not self.slope and self.start_slope:
                         self.self_drive_state = 1
-
-                    if self.self_drive_state == 2:
-                        self.setip(-4.2, 7.7, 80)
-                        self.waypoint([[-0.9, 7.8, 180], [-2.0, 3.3, 180]])
-                elif self.state_main_ros == 7:
-                    self.setip(-1.9, 4.7, 80)
-                    self.goto(-0.5, 8.0, 80)
-                elif self.state_main_ros == 8:
-                    self.waypoint([[-0.9, 7.8, 180], [-2.0, 3.3, 180]])
+                if self.self_drive_state == 2:
+                    self.check_goal()
 
         elif self.state_main == "Reset":
             self.once = False
