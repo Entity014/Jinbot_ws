@@ -41,6 +41,8 @@ setup(
             "color_flag_node = jinbot_core.bot_flag_color:main",
             "slope_node = jinbot_core.bot_slope:main",
             "navigation_node = jinbot_core.bot_nav2:main",
+            "bucket_node = jinbot_core.motor_drive_condition:main",
+            "model_bucket_node = jinbot_core.model:main",
         ],
     },
 )

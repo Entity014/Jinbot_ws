@@ -95,11 +95,13 @@ Kinematics::pwm Kinematics::calculatePWM(float pwm1, float pwm2, float pwm3)
 
 Kinematics::rpm Kinematics::getRPM(float linear_x, float linear_y, float angular_z)
 {
+    angular_z = -angular_z; // Red
     return calculateRPM(linear_x, linear_y, angular_z);
 }
 
 Kinematics::pwm Kinematics::getPWM(float pwm1, float pwm2, float pwm3)
 {
+    pwm3 = -pwm3; // Red
     return calculatePWM(pwm1, pwm2, pwm3);
 }
 
@@ -123,8 +125,8 @@ Kinematics::velocities Kinematics::getVelocities(float rpm1, float rpm2, float r
 
     // convert average revolutions per minute to revolutions per second
     average_rps_a = ((float)(rpm1 - rpm2) / 2) / 60.0;
-    vel.angular_z = (average_rps_a * wheel_circumference_) / (wheels_y_distance_ / 2.0); //  rad/s
-
+    vel.angular_z = -(average_rps_a * wheel_circumference_) / (wheels_y_distance_ / 2.0); //  rad/s
+    // Red - Blue +
     return vel;
 }
 

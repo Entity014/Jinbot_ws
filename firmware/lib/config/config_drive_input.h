@@ -5,9 +5,9 @@
 
 #define USE_GY87_IMU
 
-#define K_P 5.0
-#define K_I 0.5
-#define K_D 0.00001
+#define K_P 2   // 5.0
+#define K_I 0.5 // 0.5
+#define K_D 0   // 0.01
 
 /*
 ROBOT ORIENTATION
@@ -54,7 +54,7 @@ ROBOT ORIENTATION
 // INVERT ENCODER COUNTS
 #define MOTOR1_ENCODER_INV true
 #define MOTOR2_ENCODER_INV false
-#define MOTOR3_ENCODER_INV false
+#define MOTOR3_ENCODER_INV true // Blue false Red true
 #define MOTOR4_ENCODER_INV false
 
 #endif

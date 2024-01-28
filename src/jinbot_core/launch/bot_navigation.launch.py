@@ -7,7 +7,7 @@ from launch.actions import IncludeLaunchDescription, RegisterEventHandler
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
-MAP_NAME = "jinpao_green2"
+MAP_NAME = "jinpao_blue2"
 
 
 def generate_launch_description():
@@ -60,7 +60,13 @@ def generate_launch_description():
         output="screen",
         arguments=["-d", rviz_config_path],
     )
+    node_imu = Node(
+        package="imu_filter_madgwick",
+        executable="imu_filter_madgwick_node",
+        parameters=[{"use_mag": False}],
+    )
 
+    ld.add_action(node_imu)
     ld.add_action(launch_description)
     ld.add_action(node_localization)
     ld.add_action(launch_nav)

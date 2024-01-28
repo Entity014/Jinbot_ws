@@ -65,51 +65,171 @@ def main():
     goal_pose1 = PoseStamped()
     goal_pose1.header.frame_id = "map"
     goal_pose1.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose1.pose.position.x = -1.95
-    goal_pose1.pose.position.y = 0.7
+    goal_pose1.pose.position.x = -1.3
+    goal_pose1.pose.position.y = 0.75
     (
         goal_pose1.pose.orientation.x,
         goal_pose1.pose.orientation.y,
         goal_pose1.pose.orientation.z,
         goal_pose1.pose.orientation.w,
-    ) = quaternion_from_euler(0, 0, math.radians(185))
+    ) = quaternion_from_euler(0, 0, math.radians(180))
     goal_poses.append(goal_pose1)
     goal_pose2 = PoseStamped()
     goal_pose2.header.frame_id = "map"
     goal_pose2.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose2.pose.position.x = -2.15
-    goal_pose2.pose.position.y = 3.65
+    goal_pose2.pose.position.x = -1.8
+    goal_pose2.pose.position.y = 0.75
     (
         goal_pose2.pose.orientation.x,
         goal_pose2.pose.orientation.y,
         goal_pose2.pose.orientation.z,
         goal_pose2.pose.orientation.w,
-    ) = quaternion_from_euler(0, 0, math.radians(185))
+    ) = quaternion_from_euler(0, 0, math.radians(180))
     goal_poses.append(goal_pose2)
     goal_pose3 = PoseStamped()
     goal_pose3.header.frame_id = "map"
     goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose3.pose.position.x = -1.85
-    goal_pose3.pose.position.y = 1.4
+    goal_pose3.pose.position.x = -1.43
+    goal_pose3.pose.position.y = 0.8
     (
         goal_pose3.pose.orientation.x,
         goal_pose3.pose.orientation.y,
         goal_pose3.pose.orientation.z,
         goal_pose3.pose.orientation.w,
-    ) = quaternion_from_euler(0, 0, math.radians(-25))
+    ) = quaternion_from_euler(0, 0, math.radians(180))
     goal_poses.append(goal_pose3)
     goal_pose4 = PoseStamped()
     goal_pose4.header.frame_id = "map"
     goal_pose4.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose4.pose.position.x = -0.32
-    goal_pose4.pose.position.y = 1.0
+    goal_pose4.pose.position.x = -1.65
+    goal_pose4.pose.position.y = 1.8
     (
         goal_pose4.pose.orientation.x,
         goal_pose4.pose.orientation.y,
         goal_pose4.pose.orientation.z,
         goal_pose4.pose.orientation.w,
-    ) = quaternion_from_euler(0, 0, math.radians(100))
+    ) = quaternion_from_euler(0, 0, math.radians(180))
     goal_poses.append(goal_pose4)
+    goal_pose5 = PoseStamped()
+    goal_pose5.header.frame_id = "map"
+    goal_pose5.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose5.pose.position.x = -2.05
+    goal_pose5.pose.position.y = 3.15
+    (
+        goal_pose5.pose.orientation.x,
+        goal_pose5.pose.orientation.y,
+        goal_pose5.pose.orientation.z,
+        goal_pose5.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(210))
+    goal_poses.append(goal_pose5)
+    goal_pose6 = PoseStamped()
+    goal_pose6.header.frame_id = "map"
+    goal_pose6.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose6.pose.position.x = -1.5
+    goal_pose6.pose.position.y = 1.5
+    (
+        goal_pose6.pose.orientation.x,
+        goal_pose6.pose.orientation.y,
+        goal_pose6.pose.orientation.z,
+        goal_pose6.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(-25))
+    goal_poses.append(goal_pose6)
+    goal_pose7 = PoseStamped()
+    goal_pose7.header.frame_id = "map"
+    goal_pose7.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose7.pose.position.x = -2.35
+    goal_pose7.pose.position.y = 1.85
+    (
+        goal_pose7.pose.orientation.x,
+        goal_pose7.pose.orientation.y,
+        goal_pose7.pose.orientation.z,
+        goal_pose7.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(15))
+    goal_poses.append(goal_pose7)
+    goal_pose8 = PoseStamped()
+    goal_pose8.header.frame_id = "map"
+    goal_pose8.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose8.pose.position.x = -1.4
+    goal_pose8.pose.position.y = 1.3
+    (
+        goal_pose8.pose.orientation.x,
+        goal_pose8.pose.orientation.y,
+        goal_pose8.pose.orientation.z,
+        goal_pose8.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(105))
+    goal_poses.append(goal_pose8)
+    goal_pose9 = PoseStamped()
+    goal_pose9.header.frame_id = "map"
+    goal_pose9.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose9.pose.position.x = -0.7
+    goal_pose9.pose.position.y = 1.3
+    (
+        goal_pose9.pose.orientation.x,
+        goal_pose9.pose.orientation.y,
+        goal_pose9.pose.orientation.z,
+        goal_pose9.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(100))
+    goal_poses.append(goal_pose9)
+    # goal_pose6 = PoseStamped()
+    # goal_pose6.header.frame_id = "map"
+    # goal_pose6.header.stamp = navigator.get_clock().now().to_msg()
+    # goal_pose6.pose.position.x = -2.1
+    # goal_pose6.pose.position.y = 3.4
+    # (
+    #     goal_pose6.pose.orientation.x,
+    #     goal_pose6.pose.orientation.y,
+    #     goal_pose6.pose.orientation.z,
+    #     goal_pose6.pose.orientation.w,
+    # ) = quaternion_from_euler(0, 0, math.radians(180))
+    # goal_poses.append(goal_pose6)
+    # goal_pose2 = PoseStamped()
+    # goal_pose2.header.frame_id = "map"
+    # goal_pose2.header.stamp = navigator.get_clock().now().to_msg()
+    # goal_pose2.pose.position.x = -2.3
+    # goal_pose2.pose.position.y = 3.47
+    # (
+    #     goal_pose2.pose.orientation.x,
+    #     goal_pose2.pose.orientation.y,
+    #     goal_pose2.pose.orientation.z,
+    #     goal_pose2.pose.orientation.w,
+    # ) = quaternion_from_euler(0, 0, math.radians(185))
+    # goal_poses.append(goal_pose2)
+    # goal_pose3 = PoseStamped()
+    # goal_pose3.header.frame_id = "map"
+    # goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
+    # goal_pose3.pose.position.x = -1.8
+    # goal_pose3.pose.position.y = 1.4
+    # (
+    #     goal_pose3.pose.orientation.x,
+    #     goal_pose3.pose.orientation.y,
+    #     goal_pose3.pose.orientation.z,
+    #     goal_pose3.pose.orientation.w,
+    # ) = quaternion_from_euler(0, 0, math.radians(-25))
+    # goal_poses.append(goal_pose3)
+    # goal_pose3 = PoseStamped()
+    # goal_pose3.header.frame_id = "map"
+    # goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
+    # goal_pose3.pose.position.x = -1.85
+    # goal_pose3.pose.position.y = 1.4
+    # (
+    #     goal_pose3.pose.orientation.x,
+    #     goal_pose3.pose.orientation.y,
+    #     goal_pose3.pose.orientation.z,
+    #     goal_pose3.pose.orientation.w,
+    # ) = quaternion_from_euler(0, 0, math.radians(-25))
+    # goal_poses.append(goal_pose3)
+    # goal_pose4 = PoseStamped()
+    # goal_pose4.header.frame_id = "map"
+    # goal_pose4.header.stamp = navigator.get_clock().now().to_msg()
+    # goal_pose4.pose.position.x = -0.32
+    # goal_pose4.pose.position.y = 1.0
+    # (
+    #     goal_pose4.pose.orientation.x,
+    #     goal_pose4.pose.orientation.y,
+    #     goal_pose4.pose.orientation.z,
+    #     goal_pose4.pose.orientation.w,
+    # ) = quaternion_from_euler(0, 0, math.radians(100))
+    # goal_poses.append(goal_pose4)
 
     # sanity check a valid path exists
     # path = navigator.getPath(initial_pose, goal_pose1)

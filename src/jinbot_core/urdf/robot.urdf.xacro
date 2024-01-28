@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot name="jin_bot" xmlns:xacro="http://ros.org/wiki/xacro">
-    <xacro:include filename="$(find jinbot_core)/urdf/properties.urdf.xacro" />
+    <xacro:include filename="$(find jinbot_core)/urdf/properties_blue.urdf.xacro" />
     <xacro:include filename="$(find jinbot_core)/urdf/base.urdf.xacro" />
     <xacro:include filename="$(find jinbot_core)/urdf/mecanum_wheel.urdf.xacro" />
     <xacro:include filename="$(find jinbot_core)/urdf/drive.urdf.xacro" />

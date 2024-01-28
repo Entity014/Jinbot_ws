@@ -39,7 +39,6 @@ class BotFlagColor(Node):
         self.sub_step_motor
 
         self.sent_timer = self.create_timer(0.05, self.timer_callback)
-        self.cap = cv2.VideoCapture("My Movie 1.mov")
         self.frame = np.zeros((760, 600, 3), dtype=np.uint8)
         self.mainros_state = 0
 
@@ -65,6 +64,7 @@ class BotFlagColor(Node):
         if self.mainros_state == 6 and self.current_step_motor3 >= int(
             (415000 / 0.455) * 0.45
         ):
+            self.cap = cv2.VideoCapture("/dev/video3")
             ref, self.frame = self.cap.read()
             if ref:
                 self.frame = cv2.resize(self.frame, (760, 600))
@@ -102,10 +102,10 @@ class BotFlagColor(Node):
             cv2.destroyAllWindows()
             exit()
 
-        if self.cap.get(cv2.CAP_PROP_POS_FRAMES) == self.cap.get(
-            cv2.CAP_PROP_FRAME_COUNT
-        ):
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        # if self.cap.get(cv2.CAP_PROP_POS_FRAMES) == self.cap.get(
+        #     cv2.CAP_PROP_FRAME_COUNT
+        # ):
+        #     self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
     def sub_state_callback(self, msg_in):
         self.mainros_state = msg_in.data
@@ -144,15 +144,15 @@ class BotFlagColor(Node):
         if self.state_color == 1:
             self.sent_color = "Red"
         elif self.state_color == 2:
-            self.sent_color = "Red"
+            self.sent_color = "Blue"
         elif self.state_color == 3:
             self.sent_color = "Blue"
         elif self.state_color == 4:
-            self.sent_color = "Green"
+            self.sent_color = "Red"
         elif self.state_color == 5:
             self.sent_color = "Green"
         elif self.state_color == 6:
-            self.sent_color = "Blue"
+            self.sent_color = "Green"
         elif self.state_color >= 7:
             self.state_color = 1
 

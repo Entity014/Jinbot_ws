@@ -43,6 +43,13 @@ class BotFlagModel(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_step_motor
+        self.sub_goal = self.create_subscription(
+            Bool,
+            "drive/goal",
+            self.sub_goal_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_goal
         self.sent_timer = self.create_timer(0.05, self.timer_callback)
 
         self.declare_parameters(
@@ -78,16 +85,19 @@ class BotFlagModel(Node):
         self.distance_step_motor2 = 0.0
         self.distance_step_motor3 = 0.0
 
+        self.goal = False
+        self.cap = cv2.VideoCapture("/dev/video2")
+
     def timer_callback(self):
         msg_tuning = Float32()
         msg_hole = Bool()
-        cap = cv2.VideoCapture("/dev/video2")
-        ref, self.frame = cap.read()
+
+        ref, self.frame = self.cap.read()
         if ref:
             self.frame = cv2.resize(self.frame, (760, 600))
             self.frame = crop_vertical_half(self.frame)
             cropped_frame = self.frame.copy()
-            if self.mainros_state == 4:
+            if self.mainros_state == 4 and self.goal:
                 gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
                 blurred = cv2.GaussianBlur(gray, (7, 7), 1)
                 _, threshold = cv2.threshold(blurred, 40, 255, cv2.THRESH_BINARY_INV)
@@ -120,12 +130,16 @@ class BotFlagModel(Node):
         if self.state_main == "Reset":
             self.hole = False
             self.tuning = 90.0
+            self.goal = False
 
     def sub_state_callback(self, msg_in):
         self.mainros_state = msg_in.data
 
     def sub_main_callback(self, msg_in):
         self.state_main = msg_in.data
+
+    def sub_goal_callback(self, msg_in):
+        self.goal = msg_in.data
 
     def sub_step_motor_callback(self, msg_in):
         self.current_step_motor1 = msg_in.linear.x

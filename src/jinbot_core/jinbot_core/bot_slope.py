@@ -1,6 +1,7 @@
 import rclpy
 import numpy as np
 
+import time
 import math
 from rclpy.node import Node
 from std_msgs.msg import Bool, Int8
@@ -35,11 +36,12 @@ class BotSlope(Node):
         if roll >= 8:  # 8
             self.isSlope = True
         else:
+            time.sleep(1)
             self.isSlope = False
         msg.data = self.isSlope
-        self.get_logger().info(
-            f"{math.degrees(-self.roll)} {math.degrees(-self.pitch)} {math.degrees(-self.yaw)}"
-        )
+        # self.get_logger().info(
+        #     f"{math.degrees(-self.roll)} {math.degrees(-self.pitch)} {math.degrees(-self.yaw)}"
+        # )
         self.sent_slope.publish(msg)
 
     def sub_imu_callback(self, msg_in):

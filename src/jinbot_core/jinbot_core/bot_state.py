@@ -65,6 +65,27 @@ class BotState(Node):
             qos_profile=qos.qos_profile_sensor_data,
         )
         self.sub_goal
+        self.sub_flag_hole = self.create_subscription(
+            Bool,
+            "gripper/flag/hole",
+            self.sub_flag_hole_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_flag_hole
+        self.sub_bucket_get = self.create_subscription(
+            Bool,
+            "gripper/bucket/get",
+            self.sub_bucket_get_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_bucket_get
+        self.sub_bucket_sent = self.create_subscription(
+            Bool,
+            "gripper/bucket/sent",
+            self.sub_bucket_sent_callback,
+            qos_profile=qos.qos_profile_sensor_data,
+        )
+        self.sub_bucket_sent
 
         self.declare_parameters(
             "",
@@ -88,8 +109,10 @@ class BotState(Node):
         self.pre_team_button = 0
         self.pre_retry_button = 0
         self.flag_hold = False
+        self.flag_hole = False
         self.goal = False
-        self.pre_goal = False
+        self.get_bucket = False
+        self.sent_bucket = False
 
     def timer_callback(self):
         msg_state_main_ros = Int8()
@@ -100,6 +123,11 @@ class BotState(Node):
         if self.state_main == "Idle":
             self.state_main_ros = 1
         elif self.state_main == "Reset":
+            self.flag_hold = False
+            self.flag_hole = False
+            self.goal = False
+            self.get_bucket = False
+            self.sent_bucket = False
             if self.retry_order == "First":
                 self.state_main_ros = 1
             elif self.retry_order == "Second":
@@ -107,13 +135,13 @@ class BotState(Node):
             else:
                 self.state_main_ros = 1
         elif self.state_main == "Start":
-            if self.state_main_ros == 1 and self.goal:
+            if self.state_main_ros == 1 and self.goal and self.get_bucket:
                 self.state_main_ros = 2
                 self.goal = False
-            elif self.state_main_ros == 2 and self.goal:
+            elif self.state_main_ros == 2 and self.goal and self.sent_bucket:
                 self.state_main_ros = 3
                 self.goal = False
-            elif self.state_main_ros == 3 and self.goal:
+            elif self.state_main_ros == 3 and self.goal and self.flag_hold:
                 self.state_main_ros = 4
                 self.goal = False
             elif self.state_main_ros == 4 and self.goal:
@@ -122,7 +150,7 @@ class BotState(Node):
             elif self.state_main_ros == 5 and self.goal:
                 self.state_main_ros = 6
                 self.goal = False
-            elif self.state_main_ros == 7 and self.goal:
+            elif self.state_main_ros == 7 and self.goal and self.flag_hold:
                 self.state_main_ros = 8
                 self.goal = False
             elif self.state_main_ros == 8 and self.goal:
@@ -131,11 +159,11 @@ class BotState(Node):
         # self.state_main_ros = (
         #     self.get_parameter("main_ros").get_parameter_value().integer_value
         # )
-        self.state_retry = (
-            self.get_parameter("retry").get_parameter_value().string_value
-        )
-        self.state_main = self.get_parameter("main").get_parameter_value().string_value
-        self.state_team = self.get_parameter("team").get_parameter_value().string_value
+        # self.state_retry = (
+        #     self.get_parameter("retry").get_parameter_value().string_value
+        # )
+        # self.state_main = self.get_parameter("main").get_parameter_value().string_value
+        # self.state_team = self.get_parameter("team").get_parameter_value().string_value
 
         msg_state_main_ros.data = self.state_main_ros
         msg_state_main.data = self.state_main
@@ -193,8 +221,17 @@ class BotState(Node):
     def sub_flag_hold_callback(self, msg_in):
         self.flag_hold = msg_in.data
 
+    def sub_flag_hole_callback(self, msg_in):
+        self.flag_hole = msg_in.data
+
     def sub_goal_callback(self, msg_in):
         self.goal = msg_in.data
+
+    def sub_bucket_get_callback(self, msg_in):
+        self.get_bucket = msg_in.data
+
+    def sub_bucket_sent_callback(self, msg_in):
+        self.sent_bucket = msg_in.data
 
 
 def main():

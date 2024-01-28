@@ -49,18 +49,18 @@ class BotDrive(Node):
 
     def drive_callback(self):
         msg = Twist()
-        self.speed_x = self.get_parameter("speed.x").get_parameter_value().double_value
-        self.speed_y = self.get_parameter("speed.y").get_parameter_value().double_value
-        self.speed_z = self.get_parameter("speed.z").get_parameter_value().double_value
-        self.rotation_x = (
-            self.get_parameter("rotation.x").get_parameter_value().double_value
-        )
-        self.rotation_y = (
-            self.get_parameter("rotation.y").get_parameter_value().double_value
-        )
-        self.rotation_z = (
-            self.get_parameter("rotation.z").get_parameter_value().double_value
-        )
+        # self.speed_x = self.get_parameter("speed.x").get_parameter_value().double_value
+        # self.speed_y = self.get_parameter("speed.y").get_parameter_value().double_value
+        # self.speed_z = self.get_parameter("speed.z").get_parameter_value().double_value
+        # self.rotation_x = (
+        #     self.get_parameter("rotation.x").get_parameter_value().double_value
+        # )
+        # self.rotation_y = (
+        #     self.get_parameter("rotation.y").get_parameter_value().double_value
+        # )
+        # self.rotation_z = (
+        #     self.get_parameter("rotation.z").get_parameter_value().double_value
+        # )
         if self.self_drive_state == 0:
             msg.linear.x = self.speed_x
             self.sent_drive.publish(msg)

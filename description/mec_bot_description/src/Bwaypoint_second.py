@@ -72,13 +72,13 @@ def main():
         goal_pose1.pose.orientation.y,
         goal_pose1.pose.orientation.z,
         goal_pose1.pose.orientation.w,
-    ) = quaternion_from_euler(0, 0, math.radians(-10))
+    ) = quaternion_from_euler(0, 0, math.radians(100))
     goal_poses.append(goal_pose1)
     goal_pose2 = PoseStamped()
     goal_pose2.header.frame_id = "map"
     goal_pose2.header.stamp = navigator.get_clock().now().to_msg()
-    goal_pose2.pose.position.x = -3.5
-    goal_pose2.pose.position.y = 1.0
+    goal_pose2.pose.position.x = -3.8
+    goal_pose2.pose.position.y = 2.0
     (
         goal_pose2.pose.orientation.x,
         goal_pose2.pose.orientation.y,
@@ -86,6 +86,18 @@ def main():
         goal_pose2.pose.orientation.w,
     ) = quaternion_from_euler(0, 0, math.radians(-10))
     goal_poses.append(goal_pose2)
+    goal_pose3 = PoseStamped()
+    goal_pose3.header.frame_id = "map"
+    goal_pose3.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose3.pose.position.x = -3.8
+    goal_pose3.pose.position.y = 1.5
+    (
+        goal_pose3.pose.orientation.x,
+        goal_pose3.pose.orientation.y,
+        goal_pose3.pose.orientation.z,
+        goal_pose3.pose.orientation.w,
+    ) = quaternion_from_euler(0, 0, math.radians(-10))
+    goal_poses.append(goal_pose3)
 
     # sanity check a valid path exists
     # path = navigator.getPath(initial_pose, goal_pose1)

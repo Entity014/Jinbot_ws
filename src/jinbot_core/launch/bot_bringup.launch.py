@@ -11,7 +11,7 @@ def generate_launch_description():
     ld = LaunchDescription()
 
     config_path = PathJoinSubstitution(
-        [FindPackageShare("jinbot_core"), "config", "config.yaml"]
+        [FindPackageShare("jinbot_core"), "config", "config_red.yaml"]
     )
 
     lidar_launch_path = PathJoinSubstitution(
@@ -65,19 +65,12 @@ def generate_launch_description():
         parameters=[config_path],
     )
 
-    node_imu = Node(
-        package="imu_filter_madgwick",
-        executable="imu_filter_madgwick_node",
-        parameters=[{"use_mag": False}],
-    )
-
     ld.add_action(node_microros1)
     ld.add_action(node_microros2)
     ld.add_action(node_microros3)
     ld.add_action(node_microros4)
     ld.add_action(node_microros5)
-    # ld.add_action(node_microros6)
-    ld.add_action(node_imu)
+    ld.add_action(node_microros6)
     ld.add_action(launch_lidar)
     ld.add_action(node_lidar_filter)
 
